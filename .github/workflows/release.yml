@@ -1,0 +1,137 @@
+name: 发布新版本
+
+on:
+  push:
+    tags:
+      - 'v*'  # 当推送 v1.0.0 这样的标签时触发
+
+jobs:
+  build:
+    name: 构建多平台二进制文件
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          # Windows不支持arm64构建
+          - goos: windows
+            goarch: arm64
+
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 设置Go环境
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: 获取依赖
+      run: go mod download
+
+    - name: 构建二进制文件
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+      run: |
+        # 设置构建参数
+        VERSION=${GITHUB_REF#refs/tags/}
+        BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+        GIT_COMMIT=${GITHUB_SHA::8}
+        
+        # 构建
+        if [ "$GOOS" = "windows" ]; then
+          BINARY_NAME="claude-stats-${GOOS}-${GOARCH}.exe"
+        else
+          BINARY_NAME="claude-stats-${GOOS}-${GOARCH}"
+        fi
+        
+        go build -ldflags="-X main.Version=$VERSION -X main.BuildTime=$BUILD_TIME -X main.GitCommit=$GIT_COMMIT" -o $BINARY_NAME .
+        
+        # 创建压缩包
+        if [ "$GOOS" = "windows" ]; then
+          zip "${BINARY_NAME%.exe}.zip" $BINARY_NAME README.md LICENSE
+        else
+          tar -czf "${BINARY_NAME}.tar.gz" $BINARY_NAME README.md LICENSE
+        fi
+
+    - name: 上传构建产物
+      uses: actions/upload-artifact@v3
+      with:
+        name: binaries
+        path: |
+          *.exe
+          *.zip
+          *.tar.gz
+
+  release:
+    name: 创建Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 下载构建产物
+      uses: actions/download-artifact@v3
+      with:
+        name: binaries
+
+    - name: 创建Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          claude-stats-*
+          *.zip
+          *.tar.gz
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+        body: |
+          ## 🎉 Claude Stats ${{ github.ref_name }}
+
+          **完美的Claude Code使用统计工具新版本发布！**
+
+          ### 📦 快速下载
+
+          **Windows用户:**
+          ```powershell
+          curl -L https://github.com/zhuiye8/claude-stats/releases/download/${{ github.ref_name }}/claude-stats-windows-amd64.exe -o claude-stats.exe
+          ```
+
+          **macOS用户 (Intel):**
+          ```bash
+          curl -L https://github.com/zhuiye8/claude-stats/releases/download/${{ github.ref_name }}/claude-stats-darwin-amd64 -o claude-stats
+          chmod +x claude-stats
+          ```
+
+          **macOS用户 (Apple Silicon):**
+          ```bash
+          curl -L https://github.com/zhuiye8/claude-stats/releases/download/${{ github.ref_name }}/claude-stats-darwin-arm64 -o claude-stats
+          chmod +x claude-stats
+          ```
+
+          **Linux用户:**
+          ```bash
+          curl -L https://github.com/zhuiye8/claude-stats/releases/download/${{ github.ref_name }}/claude-stats-linux-amd64 -o claude-stats
+          chmod +x claude-stats
+          ```
+
+          ### ✨ 主要功能
+          - 🔍 智能识别API模式和订阅模式
+          - 📊 完整的token统计和成本分析
+          - 🎨 美化的终端输出和彩色支持
+          - 🌍 跨平台支持（Windows、macOS、Linux、WSL）
+          - 📈 可视化进度条和图表
+          - 💰 订阅计划建议和成本优化
+
+          ### 🚀 使用方法
+          下载后直接运行：
+          ```bash
+          ./claude-stats analyze
+          ```
+
+          更多使用方法请查看 [README.md](https://github.com/zhuiye8/claude-stats#readme)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
