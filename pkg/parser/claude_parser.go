@@ -92,6 +92,10 @@ func (p *ClaudeParser) ParseFile(filePath string) (*models.UsageStats, error) {
 	}
 
 	scanner := bufio.NewScanner(file)
+	// 增加扫描器缓冲区大小以处理长行（Claude日志可能包含大量代码）
+	maxCapacity := 10 * 1024 * 1024 // 10MB
+	buf := make([]byte, maxCapacity)
+	scanner.Buffer(buf, maxCapacity)
 	lineNum := 0
 
 	for scanner.Scan() {
