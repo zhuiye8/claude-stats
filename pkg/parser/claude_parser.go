@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/claude-stats/claude-stats/pkg/models"
+	"github.com/zhuiye8/claude-stats/pkg/models"
 )
 
 // ClaudeParser 用于解析Claude JSONL日志文件

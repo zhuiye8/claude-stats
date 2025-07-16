@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/claude-stats/claude-stats/pkg/models"
+	"github.com/zhuiye8/claude-stats/pkg/models"
 )
 
 // ModelPricing 代表模型定价信息

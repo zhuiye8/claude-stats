@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/claude-stats/claude-stats/pkg/models"
-	"github.com/claude-stats/claude-stats/pkg/parser"
+	"github.com/zhuiye8/claude-stats/pkg/models"
+	"github.com/zhuiye8/claude-stats/pkg/parser"
 )
 
 // Formatter 用于格式化输出

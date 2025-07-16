@@ -24,7 +24,8 @@
 | 5小时窗口分析 | ✅ | ❌ | ❌ | ❌ |
 | 缓存Token统计 | ✅ | ✅ | ❌ | ❌ |
 | 跨平台二进制 | ✅ | ❌ | ❌ | ❌ |
-| 实时监控 | ✅ | ❌ | ❌ | ✅ |
+| 美化终端输出 | ✅ | ❌ | ❌ | ❌ |
+| 智能颜色支持 | ✅ | ❌ | ❌ | ❌ |
 | 多格式导出 | ✅ | ❌ | ✅ | ❌ |
 
 ## 🚀 快速开始
@@ -34,24 +35,24 @@
 #### 方式1: 下载预编译二进制文件 (推荐)
 ```bash
 # Windows
-curl -L https://github.com/claude-stats/claude-stats/releases/latest/download/claude-stats-windows.exe -o claude-stats.exe
+curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-windows.exe -o claude-stats.exe
 
 # macOS
-curl -L https://github.com/claude-stats/claude-stats/releases/latest/download/claude-stats-darwin -o claude-stats
+curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-darwin -o claude-stats
 chmod +x claude-stats
 
 # Linux
-curl -L https://github.com/claude-stats/claude-stats/releases/latest/download/claude-stats-linux -o claude-stats
+curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-linux -o claude-stats
 chmod +x claude-stats
 
 # WSL
-curl -L https://github.com/claude-stats/claude-stats/releases/latest/download/claude-stats-linux -o claude-stats
+curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-linux -o claude-stats
 chmod +x claude-stats
 ```
 
 #### 方式2: 从源码编译
 ```bash
-git clone https://github.com/claude-stats/claude-stats.git
+git clone https://github.com/zhuiye8/claude-stats.git
 cd claude-stats
 go build -o claude-stats
 ```
@@ -80,12 +81,13 @@ go build -o claude-stats
 
 ## 📈 使用示例
 
-### 基础统计输出
+### 🎨 美化终端输出
 ```
 🎯 Claude Code 使用统计报告
-============================================================
+生成时间: 2025-07-16 15:30:25
+████████████████████████████████████████████████████████████████████████████████
 
-📊 基本信息:
+📊 基本信息
    检测模式: 订阅模式 (按请求限制)
    总会话数: 8
    总消息数: 156
@@ -93,18 +95,18 @@ go build -o claude-stats
    持续时间: 23h16m
 
 📈 Token 使用统计
-┌─────────────────┬──────────┬────────┐
-│ 类型            │ 数量     │ 百分比  │
-├─────────────────┼──────────┼────────┤
-│ 输入Token       │ 21,543   │ 1.5%   │
-│ 输出Token       │ 1,381    │ 0.1%   │
-│ 缓存创建Token   │ 6,630    │ 0.5%   │
-│ 缓存读取Token   │ 1,346,759│ 97.9%  │
-├─────────────────┼──────────┼────────┤
-│ 总计            │ 1,376,313│ 100.0% │
-└─────────────────┴──────────┴────────┘
+┌────────────────┬──────────┬────────┬────────────────────────────────┐
+│ 类型           │ 数量     │ 百分比  │ 可视化                           │
+├────────────────┼──────────┼────────┼────────────────────────────────┤
+│ 输入Token      │ 21,543   │ 1.5%   │ [█░░░░░░░░░░░░░░░░░░░] 1.5%      │
+│ 输出Token      │ 1,381    │ 0.1%   │ [░░░░░░░░░░░░░░░░░░░░] 0.1%      │
+│ 缓存创建Token  │ 6,630    │ 0.5%   │ [░░░░░░░░░░░░░░░░░░░░] 0.5%      │
+│ 缓存读取Token  │ 1,346,759│ 97.9%  │ [████████████████████] 97.9%    │
+├────────────────┼──────────┼────────┼────────────────────────────────┤
+│ 总计           │ 1,376,313│ 100.0% │ 📊                             │
+└────────────────┴──────────┴────────┴────────────────────────────────┘
 
-💰 成本分析:
+💰 成本分析
    (基于订阅模式的API等价成本估算)
    输入成本:     $0.0646
    输出成本:     $0.0207
@@ -112,10 +114,14 @@ go build -o claude-stats
    缓存读取成本: $0.5050
    总成本:       $0.6102
 
-🎯 订阅计划建议:
+🎯 订阅计划建议
    建议计划: Pro ($20)
    预估节省: $19.39/月
 ```
+
+> 🌈 **颜色支持**: 支持Windows Terminal、PowerShell、macOS、Linux等主流终端的彩色输出
+> 📊 **进度条**: 直观显示各类token的使用比例
+> 🎨 **智能高亮**: 根据成本数值自动选择提示颜色
 
 ### JSON格式输出
 ```json
@@ -168,6 +174,7 @@ claude-stats analyze [目录路径] [选项]
 - `--end`: 结束日期 (YYYY-MM-DD)
 - `--model`: 过滤特定模型
 - `--details, -d`: 显示详细信息
+- `--no-color`: 禁用颜色输出
 - `--verbose, -v`: 详细输出
 
 **示例:**
@@ -175,8 +182,11 @@ claude-stats analyze [目录路径] [选项]
 # 基础分析
 claude-stats analyze
 
-# 高级过滤
+# 高级过滤和美化输出
 claude-stats analyze --start 2025-07-01 --model sonnet --details
+
+# 禁用颜色输出 (适用于日志文件)
+claude-stats analyze --no-color
 
 # 导出报告
 claude-stats analyze --format csv --output monthly-report.csv
@@ -296,14 +306,14 @@ claude-stats analyze --details
 我们欢迎各种形式的贡献！
 
 ### 贡献方式
-1. **报告问题**: 在[Issues](https://github.com/claude-stats/claude-stats/issues)中报告bug
+1. **报告问题**: 在[Issues](https://github.com/zhuiye8/claude-stats/issues)中报告bug
 2. **功能建议**: 提出新功能需求
 3. **代码贡献**: 提交Pull Request
 4. **文档改进**: 改善文档和示例
 
 ### 开发环境设置
 ```bash
-git clone https://github.com/claude-stats/claude-stats.git
+git clone https://github.com/zhuiye8/claude-stats.git
 cd claude-stats
 go mod tidy
 go run main.go analyze --help
@@ -316,6 +326,8 @@ go run main.go analyze --help
 - ✅ 支持API和订阅模式智能检测
 - ✅ 完整的token统计和成本分析
 - ✅ 跨平台二进制文件支持
+- ✅ 美化终端输出和智能颜色支持
+- ✅ 可视化进度条和图标化界面
 - ✅ 多种输出格式 (表格、JSON、CSV)
 - ✅ 2025年最新Claude模型定价
 
@@ -334,6 +346,14 @@ go run main.go analyze --help
 **如果这个工具帮助到了您，请给个⭐️支持一下！**
 
 > 💬 **需要帮助?** 
-> - 查看 [文档](https://github.com/claude-stats/claude-stats/wiki)
-> - 提交 [Issue](https://github.com/claude-stats/claude-stats/issues)
-> - 加入 [讨论](https://github.com/claude-stats/claude-stats/discussions) 
+> - 查看 [文档](https://github.com/zhuiye8/claude-stats/wiki)
+> - 提交 [Issue](https://github.com/zhuiye8/claude-stats/issues)
+> - 加入 [讨论](https://github.com/zhuiye8/claude-stats/discussions)
+
+## 🎨 终端预览
+
+想看看实际的彩色输出效果？查看 [TERMINAL_PREVIEW.md](TERMINAL_PREVIEW.md) 了解详细的颜色映射和视觉效果。
+
+## 🚀 快速开始
+
+详细的跨平台安装和使用指南请查看 [QUICKSTART.md](QUICKSTART.md) 

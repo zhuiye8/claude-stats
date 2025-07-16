@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/claude-stats/claude-stats/pkg/parser"
-	"github.com/claude-stats/claude-stats/pkg/formatter"
-	"github.com/claude-stats/claude-stats/pkg/models"
+	"github.com/zhuiye8/claude-stats/pkg/parser"
+	"github.com/zhuiye8/claude-stats/pkg/formatter"
+	"github.com/zhuiye8/claude-stats/pkg/models"
 )
 
 var (

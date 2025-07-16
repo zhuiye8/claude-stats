@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/claude-stats/claude-stats/cmd"
+	"github.com/zhuiye8/claude-stats/cmd"
 )
 
 func main() {
