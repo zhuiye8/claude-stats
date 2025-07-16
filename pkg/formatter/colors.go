@@ -85,6 +85,7 @@ func (c *ColorSettings) Blue(text string) string    { return c.Colorize(text, Bl
 func (c *ColorSettings) Magenta(text string) string { return c.Colorize(text, Magenta) }
 func (c *ColorSettings) Cyan(text string) string    { return c.Colorize(text, Cyan) }
 func (c *ColorSettings) Bold(text string) string    { return c.Colorize(text, Bold) }
+func (c *ColorSettings) Dim(text string) string     { return c.Colorize(text, Dim) }
 
 func (c *ColorSettings) BrightRed(text string) string     { return c.Colorize(text, BrightRed) }
 func (c *ColorSettings) BrightGreen(text string) string   { return c.Colorize(text, BrightGreen) }

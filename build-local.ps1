@@ -49,16 +49,24 @@ function Build-Platform {
     
     go build -ldflags="-X main.Version=$Version -X main.BuildTime=$BuildTime -X main.GitCommit=$GitCommit" -o $BinaryName ../
     
-    # 创建压缩包
-    if ($Goos -eq "windows") {
-        $ZipName = "$($BinaryName.Replace('.exe', '')).zip"
-        Compress-Archive -Path $BinaryName, ../README.md, ../LICENSE -DestinationPath $ZipName -Force
-        Write-Host "    ✅ 已创建: $ZipName" -ForegroundColor Green
+    # 检查构建是否成功
+    if (Test-Path $BinaryName) {
+        Write-Host "    ✅ 构建成功: $BinaryName" -ForegroundColor Green
+        
+        # 创建压缩包
+        if ($Goos -eq "windows") {
+            $ZipName = "$($BinaryName.Replace('.exe', '')).zip"
+            Compress-Archive -Path $BinaryName, ../README.md, ../LICENSE -DestinationPath $ZipName -Force
+            Write-Host "    📦 已创建: $ZipName" -ForegroundColor Cyan
+        } else {
+            # Windows上创建tar.gz需要额外工具，这里简化为zip
+            $ZipName = "$BinaryName.zip"
+            Compress-Archive -Path $BinaryName, ../README.md, ../LICENSE -DestinationPath $ZipName -Force
+            Write-Host "    📦 已创建: $ZipName" -ForegroundColor Cyan
+        }
     } else {
-        # Windows上创建tar.gz需要额外工具，这里简化为zip
-        $ZipName = "$BinaryName.zip"
-        Compress-Archive -Path $BinaryName, ../README.md, ../LICENSE -DestinationPath $ZipName -Force
-        Write-Host "    ✅ 已创建: $ZipName" -ForegroundColor Green
+        Write-Host "    ❌ 构建失败: $BinaryName" -ForegroundColor Red
+        Write-Host "    请检查Go环境和依赖是否正确安装" -ForegroundColor Yellow
     }
 }
 

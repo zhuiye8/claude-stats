@@ -43,13 +43,21 @@ build_platform() {
         -o "$binary_name" \
         ../
     
-    # 创建压缩包
-    if [ "$goos" = "windows" ]; then
-        zip "${binary_name%.exe}.zip" "$binary_name" ../README.md ../LICENSE
-        echo "    ✅ 已创建: ${binary_name%.exe}.zip"
+    # 检查构建是否成功
+    if [ -f "$binary_name" ]; then
+        echo "    ✅ 构建成功: $binary_name"
+        
+        # 创建压缩包
+        if [ "$goos" = "windows" ]; then
+            zip "${binary_name%.exe}.zip" "$binary_name" ../README.md ../LICENSE
+            echo "    📦 已创建: ${binary_name%.exe}.zip"
+        else
+            tar -czf "${binary_name}.tar.gz" "$binary_name" ../README.md ../LICENSE
+            echo "    📦 已创建: ${binary_name}.tar.gz"
+        fi
     else
-        tar -czf "${binary_name}.tar.gz" "$binary_name" ../README.md ../LICENSE
-        echo "    ✅ 已创建: ${binary_name}.tar.gz"
+        echo "    ❌ 构建失败: $binary_name"
+        echo "    请检查Go环境和依赖是否正确安装"
     fi
 }
 
