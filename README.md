@@ -4,9 +4,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org)
-[![Version](https://img.shields.io/badge/Version-v1.0.7-brightgreen.svg)](https://github.com/zhuiye8/claude-stats/releases)
+[![Version](https://img.shields.io/badge/Version-v1.0.8-brightgreen.svg)](https://github.com/zhuiye8/claude-stats/releases)
 
-> **🌍 v1.0.7全局版**: 新增一键全局安装，像Claude Code一样在任何位置使用！
+> **🎯 v1.0.8智能版**: 修复百分比逻辑，新增订阅限额状态，优化可视化展示！
 
 > 专为Claude Code用户设计的终极统计工具，解决现有工具的所有痛点
 
@@ -20,16 +20,20 @@
 | 智能模式检测 | ✅ 自动识别 | ❌ 仅API | ❌ 仅基础 | ❌ 手动 |
 | 订阅模式支持 | ✅ 等价成本分析 | ❌ 无 | ❌ 无 | ❌ 无 |
 | 5小时窗口分析 | ✅ 内建支持 | ❌ 无 | ❌ 无 | ❌ 无 |
+| 订阅限额状态 | ✅ 实时显示 | ❌ 无 | ❌ 无 | ❌ 无 |
+| 百分比可视化 | ✅ 智能计算 | ❌ 无 | ❌ 基础 | ❌ 基础 |
 | 美化终端输出 | ✅ 渐变+图标 | ❌ 基础 | ❌ 基础 | ❌ 基础 |
 | 成本可视化 | ✅ 进度条+色彩 | ❌ 无 | ❌ 无 | ❌ 无 |
 | 跨平台支持 | ✅ 全平台 | ❌ 有限 | ❌ 有限 | ❌ 有限 |
 | 缓存token分析 | ✅ 完整支持 | ❌ 无 | ❌ 无 | ❌ 无 |
-| 订阅计划建议 | ✅ 智能推荐 | ❌ 无 | ❌ 无 | ❌ 无 |
+| 订阅优化建议 | ✅ 智能推荐 | ❌ 无 | ❌ 无 | ❌ 无 |
 
 ### 🌟 独有功能
+- **订阅限额实时状态** - 显示当前窗口使用情况、剩余消息数、重置时间
+- **智能百分比计算** - 基础Token和缓存Token分离显示，避免百分比失真
 - **订阅模式"等价API成本"** - 当/cost命令失效时的完美替代
 - **5小时重置窗口分析** - 专为Claude Code订阅模式设计
-- **智能订阅计划建议** - 根据使用模式推荐最优计划
+- **智能订阅优化建议** - 根据使用模式推荐最优计划和使用技巧
 - **完整缓存token统计** - 精确的缓存创建和读取分析
 
 ## 🚀 快速开始

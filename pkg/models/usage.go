@@ -56,6 +56,20 @@ type Content struct {
 	Text string `json:"text,omitempty"`
 }
 
+// SubscriptionQuota 订阅模式限额信息
+type SubscriptionQuota struct {
+	Plan                string    `json:"plan"`                 // Pro, Max5x, Max20x
+	WindowDuration      string    `json:"window_duration"`      // "5小时"
+	WindowsPerDay       int       `json:"windows_per_day"`      // 4
+	MessagesPerWindow   int       `json:"messages_per_window"`  // 根据计划不同
+	EstimatedUsed       int       `json:"estimated_used"`       // 估算已使用
+	EstimatedRemaining  int       `json:"estimated_remaining"`  // 估算剩余
+	NextResetTime       time.Time `json:"next_reset_time"`      // 下次重置时间
+	UsagePercentage     float64   `json:"usage_percentage"`     // 使用百分比
+	ModelSwitchPoint    int       `json:"model_switch_point"`   // 从Opus切换到Sonnet的消息数
+	CurrentModel        string    `json:"current_model"`        // 当前预期使用的模型
+}
+
 // UsageStats 代表统计结果
 type UsageStats struct {
 	TotalSessions       int                    `json:"total_sessions"`
@@ -73,6 +87,9 @@ type UsageStats struct {
 	MessageTypes        map[string]int          `json:"message_types"`
 	ParsedMessages      int                     `json:"parsed_messages"`
 	ExtractedTokens     int                     `json:"extracted_tokens"`
+	
+	// 新增：订阅限额信息
+	SubscriptionQuota   *SubscriptionQuota     `json:"subscription_quota,omitempty"`
 }
 
 // SessionInfo 代表会话信息
@@ -137,4 +154,88 @@ func (u *TokenUsage) Add(other TokenUsage) {
 func (u *TokenUsage) IsEmpty() bool {
 	return u.InputTokens == 0 && u.OutputTokens == 0 && 
 		   u.CacheCreationTokens == 0 && u.CacheReadTokens == 0
+} 
+
+// EstimateSubscriptionQuota 根据使用情况估算订阅限额
+func (u *UsageStats) EstimateSubscriptionQuota() *SubscriptionQuota {
+	if u.DetectedMode != "subscription" {
+		return nil
+	}
+	
+	// 根据总成本估算计划类型
+	plan := "Pro"
+	messagesPerWindow := 45
+	modelSwitchPoint := 9  // 20%的消息数使用Opus
+	
+	// 如果成本很高，可能是Max计划
+	if u.EstimatedCost.TotalCost > 50 {
+		if u.EstimatedCost.TotalCost > 150 {
+			plan = "Max20x"
+			messagesPerWindow = 900
+			modelSwitchPoint = 180
+		} else {
+			plan = "Max5x" 
+			messagesPerWindow = 225
+			modelSwitchPoint = 45
+		}
+	}
+	
+	// 估算当前5小时窗口的使用情况
+	// 假设分析时段的最后5小时为当前窗口
+	var recentMessages int
+	if !u.AnalysisPeriod.EndTime.IsZero() {
+		// 简单估算：如果分析时段小于5小时，就用全部消息
+		duration := u.AnalysisPeriod.EndTime.Sub(u.AnalysisPeriod.StartTime)
+		if duration.Hours() <= 5 {
+			recentMessages = u.TotalMessages
+		} else {
+			// 否则按比例估算最近5小时的消息数
+			recentMessages = int(float64(u.TotalMessages) * 5.0 / duration.Hours())
+		}
+	} else {
+		// 如果没有时间信息，假设所有消息都在当前窗口
+		recentMessages = u.TotalMessages
+	}
+	
+	// 计算剩余消息数
+	remaining := messagesPerWindow - recentMessages
+	if remaining < 0 {
+		remaining = 0
+	}
+	
+	// 计算使用百分比
+	usagePercentage := float64(recentMessages) * 100.0 / float64(messagesPerWindow)
+	if usagePercentage > 100 {
+		usagePercentage = 100
+	}
+	
+	// 确定当前模型
+	currentModel := "Claude 4 Sonnet"
+	if recentMessages <= modelSwitchPoint {
+		currentModel = "Claude 4 Opus"
+	}
+	
+	// 估算下次重置时间（5小时窗口）
+	nextReset := time.Now().Add(time.Hour * 5)
+	if !u.AnalysisPeriod.EndTime.IsZero() {
+		// 基于最后活动时间估算
+		lastActivity := u.AnalysisPeriod.EndTime
+		timeSinceLastActivity := time.Since(lastActivity)
+		if timeSinceLastActivity < time.Hour*5 {
+			nextReset = lastActivity.Add(time.Hour * 5)
+		}
+	}
+	
+	return &SubscriptionQuota{
+		Plan:               plan,
+		WindowDuration:     "5小时",
+		WindowsPerDay:      4,
+		MessagesPerWindow:  messagesPerWindow,
+		EstimatedUsed:      recentMessages,
+		EstimatedRemaining: remaining,
+		NextResetTime:      nextReset,
+		UsagePercentage:    usagePercentage,
+		ModelSwitchPoint:   modelSwitchPoint,
+		CurrentModel:       currentModel,
+	}
 } 

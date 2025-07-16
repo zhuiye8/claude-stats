@@ -97,6 +97,11 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		stats = filterByModel(stats, modelFilter)
 	}
 
+	// 估算订阅限额信息
+	if stats.DetectedMode == "subscription" {
+		stats.SubscriptionQuota = stats.EstimateSubscriptionQuota()
+	}
+
 	// 格式化并输出结果
 	formatter := formatter.NewFormatter()
 	formatter.ShowDetails = showDetails

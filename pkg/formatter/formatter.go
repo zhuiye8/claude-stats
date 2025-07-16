@@ -133,9 +133,6 @@ func (f *Formatter) formatTable(stats *models.UsageStats) (string, error) {
 	// 添加美化的标题
 	f.writeHeader(&output, stats)
 
-	// 添加装饰性分隔符
-	output.WriteString(f.Colors.GradientSeparator(80) + "\n\n")
-
 	// 基本信息
 	f.writeBasicInfo(&output, stats)
 
@@ -150,6 +147,11 @@ func (f *Formatter) formatTable(stats *models.UsageStats) (string, error) {
 	// 成本分析
 	f.writeCostAnalysis(&output, stats)
 
+	// 订阅限额信息 (仅订阅模式显示)
+	if stats.SubscriptionQuota != nil {
+		f.writeSubscriptionQuota(&output, stats)
+	}
+
 	// 详细信息
 	if f.ShowDetails {
 		f.writeDetailedStats(&output, stats)
@@ -160,41 +162,67 @@ func (f *Formatter) formatTable(stats *models.UsageStats) (string, error) {
 
 // writeHeader 写入美化的标题
 func (f *Formatter) writeHeader(output *strings.Builder, stats *models.UsageStats) {
-	// 主标题
-	title := f.Colors.Header("🎯 Claude Code 使用统计报告")
-	output.WriteString(fmt.Sprintf("%s\n", title))
+	// Claude Stats ASCII 艺术字
+	output.WriteString("\n")
+	output.WriteString(f.Colors.BrightMagenta("  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗\n"))
+	output.WriteString(f.Colors.BrightCyan("██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝\n"))
+	output.WriteString(f.Colors.BrightBlue("██║     ██║     ███████║██║   ██║██║  ██║█████╗  \n"))
+	output.WriteString(f.Colors.BrightGreen("██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝  \n"))
+	output.WriteString(f.Colors.BrightYellow("╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗\n"))
+	output.WriteString(f.Colors.BrightRed(" ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝\n"))
 	
-	// 版本和时间信息
-	subtitle := f.Colors.Dim(fmt.Sprintf("生成时间: %s", time.Now().Format("2006-01-02 15:04:05")))
-	output.WriteString(fmt.Sprintf("%s\n", subtitle))
+	output.WriteString(f.Colors.BrightMagenta("███████╗████████╗ █████╗ ████████╗███████╗\n"))
+	output.WriteString(f.Colors.BrightCyan("██╔════╝╚══██╔══╝██╔══██╗╚══██╔══╝██╔════╝\n"))
+	output.WriteString(f.Colors.BrightBlue("███████╗   ██║   ███████║   ██║   ███████╗\n"))
+	output.WriteString(f.Colors.BrightGreen("╚════██║   ██║   ██╔══██║   ██║   ╚════██║\n"))
+	output.WriteString(f.Colors.BrightYellow("███████║   ██║   ██║  ██║   ██║   ███████║\n"))
+	output.WriteString(f.Colors.BrightRed("╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚══════╝\n"))
+	
+	// 右下角作者信息
+	authorInfo := fmt.Sprintf("%s%s", 
+		strings.Repeat(" ", 45), 
+		f.Colors.Dim("作者: zhuiye"))
+	output.WriteString(authorInfo + "\n\n")
+	
+	// 副标题信息
+	subtitle := f.Colors.Info(fmt.Sprintf("🎯 Claude Code 使用统计分析工具  •  生成时间: %s", 
+		time.Now().Format("2006-01-02 15:04:05")))
+	output.WriteString(fmt.Sprintf("%s\n\n", subtitle))
+	
+	// 装饰性分隔线
+	separator := f.Colors.BrightBlue("═") + f.Colors.BrightCyan("═") + f.Colors.BrightGreen("═") + f.Colors.BrightYellow("═")
+	fullSeparator := strings.Repeat(separator, 20)
+	output.WriteString(fullSeparator + "\n\n")
 }
 
 // writeBasicInfo 写入基本信息
 func (f *Formatter) writeBasicInfo(output *strings.Builder, stats *models.UsageStats) {
-	sectionTitle := f.Colors.IconHeader("📊", "基本信息", BrightBlue)
+	sectionTitle := f.Colors.IconHeader("📋", "基本信息", BrightBlue)
 	output.WriteString(fmt.Sprintf("%s\n", sectionTitle))
 	
 	mode := getModeDisplay(stats.DetectedMode)
 	modeColor := Green
+	modeIcon := "🔧"
 	if stats.DetectedMode == "subscription" {
 		modeColor = BrightMagenta
+		modeIcon = "💎"
 	}
 	
-	output.WriteString(fmt.Sprintf("   检测模式: %s\n", f.Colors.Colorize(mode, modeColor)))
-	output.WriteString(fmt.Sprintf("   总会话数: %s\n", f.Colors.BrightYellow(formatNumber(stats.TotalSessions))))
-	output.WriteString(fmt.Sprintf("   总消息数: %s\n", f.Colors.BrightCyan(formatNumber(stats.TotalMessages))))
+	output.WriteString(fmt.Sprintf("   %s 检测模式: %s\n", modeIcon, f.Colors.Colorize(mode, modeColor)))
+	output.WriteString(fmt.Sprintf("   📊 总会话数: %s\n", f.Colors.BrightYellow(formatNumber(stats.TotalSessions))))
+	output.WriteString(fmt.Sprintf("   💬 总消息数: %s\n", f.Colors.BrightCyan(formatNumber(stats.TotalMessages))))
 	
-	// 新增：Claude Code 特定信息
+	// Claude Code 特定信息
 	if stats.ParsedMessages > 0 {
 		parseRate := float64(stats.ParsedMessages) * 100 / float64(stats.TotalMessages)
-		output.WriteString(fmt.Sprintf("   解析成功: %s (%s)\n", 
+		output.WriteString(fmt.Sprintf("   ✅ 解析成功: %s (%s)\n", 
 			f.Colors.BrightGreen(formatNumber(stats.ParsedMessages)),
 			f.Colors.Cyan(fmt.Sprintf("%.1f%%", parseRate))))
 	}
 	
 	if stats.ExtractedTokens > 0 {
 		extractRate := float64(stats.ExtractedTokens) * 100 / float64(stats.TotalMessages)
-		output.WriteString(fmt.Sprintf("   Token提取: %s (%s)\n", 
+		output.WriteString(fmt.Sprintf("   🎯 Token提取: %s (%s)\n", 
 			f.Colors.BrightGreen(formatNumber(stats.ExtractedTokens)),
 			f.Colors.Cyan(fmt.Sprintf("%.1f%%", extractRate))))
 	}
@@ -203,13 +231,13 @@ func (f *Formatter) writeBasicInfo(output *strings.Builder, stats *models.UsageS
 		timeRange := fmt.Sprintf("%s 至 %s", 
 			stats.AnalysisPeriod.StartTime.Format("2006-01-02 15:04"),
 			stats.AnalysisPeriod.EndTime.Format("2006-01-02 15:04"))
-		output.WriteString(fmt.Sprintf("   分析时段: %s\n", f.Colors.Info(timeRange)))
-		output.WriteString(fmt.Sprintf("   持续时间: %s\n", f.Colors.Info(stats.AnalysisPeriod.Duration)))
+		output.WriteString(fmt.Sprintf("   📅 分析时段: %s\n", f.Colors.Info(timeRange)))
+		output.WriteString(fmt.Sprintf("   ⏰ 持续时间: %s\n", f.Colors.Info(stats.AnalysisPeriod.Duration)))
 	}
 	
 	// 显示消息类型分布
 	if len(stats.MessageTypes) > 0 {
-		output.WriteString(fmt.Sprintf("   消息类型: %s\n", f.formatMessageTypes(stats.MessageTypes)))
+		output.WriteString(fmt.Sprintf("   🏷️  消息类型: %s\n", f.formatMessageTypes(stats.MessageTypes)))
 	}
 	
 	output.WriteString("\n")
@@ -238,55 +266,61 @@ func (f *Formatter) writeTotalStats(output *strings.Builder, stats *models.Usage
 	sectionTitle := f.Colors.IconHeader("📈", "Token 使用统计", BrightGreen)
 	output.WriteString(fmt.Sprintf("%s\n", sectionTitle))
 	
+	// 添加百分比计算说明
+	baseTokens := stats.TotalTokens.InputTokens + stats.TotalTokens.OutputTokens
+	output.WriteString(fmt.Sprintf("   💡 %s\n\n", 
+		f.Colors.Dim(fmt.Sprintf("百分比基准: 基础Token(%s) = 输入Token + 输出Token", formatNumber(baseTokens)))))
+	
 	t := table.NewWriter()
 	t.AppendHeader(table.Row{
 		f.Colors.Header("类型"), 
 		f.Colors.Header("数量"), 
 		f.Colors.Header("百分比"),
-		f.Colors.Header("可视化"),
+		f.Colors.Header("说明"),
 	})
 
-	total := stats.TotalTokens.GetTotalTokens()
-	if total > 0 {
-		// 输入Token
-		inputPct := float64(stats.TotalTokens.InputTokens) * 100 / float64(total)
-		inputBar := f.Colors.ProgressBar(stats.TotalTokens.InputTokens, total, 20)
+	if baseTokens > 0 {
+		// 输入Token - 基于基础Token计算百分比
+		inputPct := float64(stats.TotalTokens.InputTokens) * 100 / float64(baseTokens)
+		inputDesc := fmt.Sprintf("📥 %s", f.Colors.Info("用户提问成本"))
 		t.AppendRow(table.Row{
 			f.Colors.BrightBlue("输入Token"), 
 			f.Colors.BrightYellow(formatNumber(stats.TotalTokens.InputTokens)),
-			f.Colors.Cyan(fmt.Sprintf("%.1f%%", inputPct)),
-			inputBar,
+			f.Colors.BrightGreen(fmt.Sprintf("%.1f%%", inputPct)),
+			inputDesc,
 		})
 		
-		// 输出Token
-		outputPct := float64(stats.TotalTokens.OutputTokens) * 100 / float64(total)
-		outputBar := f.Colors.ProgressBar(stats.TotalTokens.OutputTokens, total, 20)
+		// 输出Token - 基于基础Token计算百分比
+		outputPct := float64(stats.TotalTokens.OutputTokens) * 100 / float64(baseTokens)
+		outputDesc := fmt.Sprintf("📤 %s", f.Colors.Info("AI回复成本"))
 		t.AppendRow(table.Row{
 			f.Colors.BrightGreen("输出Token"), 
 			f.Colors.BrightYellow(formatNumber(stats.TotalTokens.OutputTokens)),
-			f.Colors.Cyan(fmt.Sprintf("%.1f%%", outputPct)),
-			outputBar,
+			f.Colors.BrightGreen(fmt.Sprintf("%.1f%%", outputPct)),
+			outputDesc,
 		})
 		
+		// 添加分隔线
+		t.AppendSeparator()
+		
+		// 缓存Token单独显示，不参与百分比计算
 		if stats.TotalTokens.CacheCreationTokens > 0 {
-			cachePct := float64(stats.TotalTokens.CacheCreationTokens) * 100 / float64(total)
-			cacheBar := f.Colors.ProgressBar(stats.TotalTokens.CacheCreationTokens, total, 20)
+			cacheDesc := fmt.Sprintf("📦 %s", f.Colors.Success("上下文缓存"))
 			t.AppendRow(table.Row{
 				f.Colors.BrightMagenta("缓存创建Token"), 
 				f.Colors.BrightYellow(formatNumber(stats.TotalTokens.CacheCreationTokens)),
-				f.Colors.Cyan(fmt.Sprintf("%.1f%%", cachePct)),
-				cacheBar,
+				f.Colors.Dim("不计入%"),
+				cacheDesc,
 			})
 		}
 		
 		if stats.TotalTokens.CacheReadTokens > 0 {
-			readPct := float64(stats.TotalTokens.CacheReadTokens) * 100 / float64(total)
-			readBar := f.Colors.ProgressBar(stats.TotalTokens.CacheReadTokens, total, 20)
+			readDesc := fmt.Sprintf("⚡ %s", f.Colors.Success("缓存加速"))
 			t.AppendRow(table.Row{
 				f.Colors.BrightCyan("缓存读取Token"), 
 				f.Colors.BrightYellow(formatNumber(stats.TotalTokens.CacheReadTokens)),
-				f.Colors.Cyan(fmt.Sprintf("%.1f%%", readPct)),
-				readBar,
+				f.Colors.Dim("不计入%"),
+				readDesc,
 			})
 		}
 	} else {
@@ -299,16 +333,18 @@ func (f *Formatter) writeTotalStats(output *strings.Builder, stats *models.Usage
 		})
 	}
 
+	// 总计行显示基础Token
 	t.AppendFooter(table.Row{
-		f.Colors.Bold("总计"), 
-		f.Colors.Bold(f.Colors.BrightYellow(formatNumber(total))), 
+		f.Colors.Bold("💰 基础Token总计"), 
+		f.Colors.Bold(f.Colors.BrightYellow(formatNumber(baseTokens))), 
 		f.Colors.Bold("100.0%"),
-		f.Colors.Bold("📊"),
+		f.Colors.Bold("💡 真实使用成本"),
 	})
 	
 	// 使用更美观的表格样式
 	t.SetStyle(table.StyleColoredBright)
 	t.Style().Options.SeparateRows = true
+	t.Style().Options.DrawBorder = true
 
 	output.WriteString(t.Render() + "\n\n")
 }
@@ -388,26 +424,189 @@ func (f *Formatter) writeCostAnalysis(output *strings.Builder, stats *models.Usa
 
 	// 订阅模式建议
 	if stats.DetectedMode == "subscription" {
-		costCalculator := parser.NewCostCalculator()
-		analysis := costCalculator.GetSubscriptionEquivalent(stats)
-		
 		output.WriteString("\n")
-		suggestionTitle := f.Colors.IconHeader("🎯", "订阅计划建议", BrightMagenta)
+		suggestionTitle := f.Colors.IconHeader("🎯", "订阅优化建议", BrightMagenta)
 		output.WriteString(fmt.Sprintf("%s\n", suggestionTitle))
 		
-		planColor := BrightGreen
-		if strings.Contains(analysis.RecommendedPlan, "Max") {
-			planColor = BrightYellow
-		}
-		output.WriteString(fmt.Sprintf("   建议计划: %s\n", f.Colors.Colorize(analysis.RecommendedPlan, planColor)))
-		
-		if analysis.MonthlySavings > 0 {
-			savingsStr := f.Colors.Success(fmt.Sprintf("$%.2f/月", analysis.MonthlySavings))
-			output.WriteString(fmt.Sprintf("   预估节省: %s\n", savingsStr))
+		if stats.SubscriptionQuota != nil {
+			quota := stats.SubscriptionQuota
+			
+			// 使用率建议
+			if quota.UsagePercentage > 90 {
+				output.WriteString(fmt.Sprintf("   ⚠️  %s\n", f.Colors.Warning("当前窗口即将用完，建议升级计划")))
+				if quota.Plan == "Pro" {
+					output.WriteString(fmt.Sprintf("   💡 考虑升级到 %s (5倍限额)\n", f.Colors.BrightYellow("Max 5×")))
+				}
+			} else if quota.UsagePercentage < 30 {
+				output.WriteString(fmt.Sprintf("   ✅ %s\n", f.Colors.Success("当前计划使用充裕")))
+				if quota.Plan != "Pro" {
+					output.WriteString(fmt.Sprintf("   💡 可考虑降级到 %s 节省成本\n", f.Colors.BrightGreen("Pro 计划")))
+				}
+			} else {
+				output.WriteString(fmt.Sprintf("   ✅ %s\n", f.Colors.Info("当前计划使用合理")))
+			}
+			
+			// 效率提示
+			output.WriteString(fmt.Sprintf("   💡 使用 %s 和 %s 可延长限额\n", 
+				f.Colors.BrightCyan("/compact"), f.Colors.BrightCyan("/clear")))
+			
+			// 成本效益分析
+			apiEquivalentCost := cost.TotalCost
+			planCost := getPlanCostFloat(quota.Plan)
+			if apiEquivalentCost > planCost*2 {
+				savings := apiEquivalentCost - planCost
+				output.WriteString(fmt.Sprintf("   💰 订阅模式节省: %s (相比API付费)\n", 
+					f.Colors.Success(fmt.Sprintf("$%.2f/月", savings))))
+			}
+		} else {
+			// 兜底建议
+			costCalculator := parser.NewCostCalculator()
+			analysis := costCalculator.GetSubscriptionEquivalent(stats)
+			output.WriteString(fmt.Sprintf("   建议计划: %s\n", f.Colors.BrightGreen(analysis.RecommendedPlan)))
 		}
 	}
 	
 	output.WriteString("\n")
+}
+
+// writeSubscriptionQuota 写入订阅限额信息
+func (f *Formatter) writeSubscriptionQuota(output *strings.Builder, stats *models.UsageStats) {
+	quota := stats.SubscriptionQuota
+	sectionTitle := f.Colors.IconHeader("⚙️", "订阅限额状态", BrightMagenta)
+	output.WriteString(fmt.Sprintf("%s\n", sectionTitle))
+	
+	// 计划信息卡片
+	planColor := BrightBlue
+	planEmoji := "🥉"
+	if quota.Plan == "Max20x" {
+		planColor = BrightMagenta
+		planEmoji = "🥇"
+	} else if quota.Plan == "Max5x" {
+		planColor = BrightYellow
+		planEmoji = "🥈"
+	}
+	
+	output.WriteString(fmt.Sprintf("   %s 当前计划: %s (%s)\n", 
+		planEmoji,
+		f.Colors.Colorize(quota.Plan, planColor),
+		f.Colors.Dim(fmt.Sprintf("$%s/月", getPlanPrice(quota.Plan)))))
+	
+	// 窗口信息
+	output.WriteString(fmt.Sprintf("   🕐 限额窗口: %s (%s)\n", 
+		f.Colors.Info(quota.WindowDuration),
+		f.Colors.Dim("每天4个窗口")))
+	
+	// 使用情况进度条
+	usageColor := BrightGreen
+	usageEmoji := "🟢"
+	if quota.UsagePercentage > 80 {
+		usageColor = BrightRed
+		usageEmoji = "🔴"
+	} else if quota.UsagePercentage > 60 {
+		usageColor = BrightYellow
+		usageEmoji = "🟡"
+	}
+	
+	// 创建简单的进度条
+	barLength := 20
+	filledLength := int(float64(barLength) * quota.UsagePercentage / 100.0)
+	progressBar := strings.Repeat("█", filledLength) + strings.Repeat("░", barLength-filledLength)
+	
+	output.WriteString(fmt.Sprintf("   %s 当前窗口: %s / %s 消息\n",
+		usageEmoji,
+		f.Colors.Colorize(formatNumber(quota.EstimatedUsed), usageColor),
+		f.Colors.BrightCyan(formatNumber(quota.MessagesPerWindow))))
+	
+	output.WriteString(fmt.Sprintf("   📊 使用进度: [%s] %s\n",
+		f.Colors.Colorize(progressBar, usageColor),
+		f.Colors.Colorize(fmt.Sprintf("%.1f%%", quota.UsagePercentage), usageColor)))
+	
+	// 剩余消息数
+	if quota.EstimatedRemaining > 0 {
+		remainingColor := BrightGreen
+		if quota.EstimatedRemaining < 10 {
+			remainingColor = BrightRed
+		} else if quota.EstimatedRemaining < 20 {
+			remainingColor = BrightYellow
+		}
+		output.WriteString(fmt.Sprintf("   ✨ 剩余消息: %s\n", 
+			f.Colors.Colorize(formatNumber(quota.EstimatedRemaining), remainingColor)))
+	} else {
+		output.WriteString(fmt.Sprintf("   ❌ 剩余消息: %s\n", 
+			f.Colors.BrightRed("已用完，等待重置")))
+	}
+	
+	// 当前模型
+	modelIcon := "🔥"
+	modelDesc := "高性能模型"
+	if quota.CurrentModel == "Claude 4 Sonnet" {
+		modelIcon = "⚡"
+		modelDesc = "标准模型"
+	}
+	output.WriteString(fmt.Sprintf("   %s 当前模型: %s (%s)\n", 
+		modelIcon, 
+		f.Colors.BrightBlue(quota.CurrentModel),
+		f.Colors.Dim(modelDesc)))
+	
+	// 下次重置时间
+	timeUntilReset := time.Until(quota.NextResetTime)
+	if timeUntilReset > 0 {
+		resetColor := BrightGreen
+		if timeUntilReset < time.Hour {
+			resetColor = BrightYellow
+		}
+		output.WriteString(fmt.Sprintf("   ⏳ 重置时间: %s (%s)\n", 
+			f.Colors.Dim(quota.NextResetTime.Format("15:04")),
+			f.Colors.Colorize(formatDuration(timeUntilReset), resetColor)))
+	} else {
+		output.WriteString(fmt.Sprintf("   🔄 重置状态: %s\n", 
+			f.Colors.BrightGreen("已可重置")))
+	}
+	
+	output.WriteString("\n")
+}
+
+// getPlanPrice 获取计划价格（字符串）
+func getPlanPrice(plan string) string {
+	switch plan {
+	case "Pro":
+		return "20"
+	case "Max5x":
+		return "100"
+	case "Max20x":
+		return "200"
+	default:
+		return "?"
+	}
+}
+
+// getPlanCostFloat 获取计划价格（浮点数）
+func getPlanCostFloat(plan string) float64 {
+	switch plan {
+	case "Pro":
+		return 20.0
+	case "Max5x":
+		return 100.0
+	case "Max20x":
+		return 200.0
+	default:
+		return 0.0
+	}
+}
+
+// formatDuration 格式化时间间隔
+func formatDuration(d time.Duration) string {
+	if d < 0 {
+		return "已过期"
+	}
+	
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	
+	if hours > 0 {
+		return fmt.Sprintf("%d小时%d分钟后", hours, minutes)
+	}
+	return fmt.Sprintf("%d分钟后", minutes)
 }
 
 // writeDetailedStats 写入详细统计
