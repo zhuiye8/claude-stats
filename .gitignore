@@ -1,0 +1,48 @@
+# 二进制文件
+claude-stats
+claude-stats.exe
+*.exe
+
+# 构建目录
+dist/
+build/
+
+# Go相关
+*.mod
+vendor/
+
+# 测试和覆盖率文件
+*.out
+coverage.html
+*.test
+
+# 日志文件
+*.log
+
+# 配置文件（除了示例）
+.claude-stats.yaml
+config.yaml
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 发布包
+*.zip
+*.tar.gz
+
+# 开发用的测试数据（真实的Claude日志可能包含敏感信息）
+test-data/real/
+logs/ 
