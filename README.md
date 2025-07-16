@@ -35,20 +35,26 @@
 #### 方式1: 下载预编译二进制文件 (推荐)
 ```bash
 # Windows
-curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-windows.exe -o claude-stats.exe
+curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-windows-amd64.zip -o claude-stats.zip
+Expand-Archive claude-stats.zip
 
-# macOS
-curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-darwin -o claude-stats
-chmod +x claude-stats
+# macOS (Intel)
+curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-darwin-amd64.tar.gz -o claude-stats.tar.gz
+tar -xzf claude-stats.tar.gz
+chmod +x claude-stats-darwin-amd64
 
 # Linux
-curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-linux -o claude-stats
-chmod +x claude-stats
+curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-linux-amd64.tar.gz -o claude-stats.tar.gz
+tar -xzf claude-stats.tar.gz
+chmod +x claude-stats-linux-amd64
 
 # WSL
-curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-linux -o claude-stats
-chmod +x claude-stats
+curl -L https://github.com/zhuiye8/claude-stats/releases/latest/download/claude-stats-linux-amd64.tar.gz -o claude-stats.tar.gz
+tar -xzf claude-stats.tar.gz
+chmod +x claude-stats-linux-amd64
 ```
+
+> **⚠️ 下载问题？** 如果遇到GitHub Actions构建问题，请查看 [构建问题解决方案](GITHUB_ACTIONS_TROUBLESHOOTING.md)
 
 #### 方式2: 从源码编译
 ```bash
@@ -60,24 +66,28 @@ go build -o claude-stats
 ### 基础使用
 
 ```bash
-# 自动分析默认Claude目录
-./claude-stats analyze
+# 自动分析默认Claude目录（Linux/macOS）
+./claude-stats-linux-amd64 analyze
+# 或 Windows: claude-stats-windows-amd64.exe analyze
+# 或 macOS: ./claude-stats-darwin-amd64 analyze
 
 # 分析指定目录
-./claude-stats analyze ~/claude-logs
+./claude-stats-linux-amd64 analyze ~/claude-logs
 
 # 查看详细信息
-./claude-stats analyze --details
+./claude-stats-linux-amd64 analyze --details
 
 # 导出JSON报告
-./claude-stats analyze --format json --output report.json
+./claude-stats-linux-amd64 analyze --format json --output report.json
 
 # 按日期范围过滤
-./claude-stats analyze --start 2025-07-01 --end 2025-07-16
+./claude-stats-linux-amd64 analyze --start 2025-07-01 --end 2025-07-16
 
 # 按模型过滤
-./claude-stats analyze --model sonnet
+./claude-stats-linux-amd64 analyze --model sonnet
 ```
+
+> **💡 提示：** 为了方便使用，建议将二进制文件重命名为`claude-stats`或添加到系统PATH中。
 
 ## 📈 使用示例
 
