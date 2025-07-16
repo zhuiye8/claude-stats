@@ -134,13 +134,30 @@ func (c *ColorSettings) IconHeader(icon, title, color string) string {
 
 // 创建进度条效果
 func (c *ColorSettings) ProgressBar(current, total int, width int) string {
-	if total == 0 {
+	if total == 0 || current < 0 || width <= 0 {
 		return ""
 	}
 	
 	percentage := float64(current) / float64(total)
+	// 确保percentage不超过100%
+	if percentage > 1.0 {
+		percentage = 1.0
+	}
+	
 	filled := int(percentage * float64(width))
+	// 确保filled不超过width
+	if filled > width {
+		filled = width
+	}
+	if filled < 0 {
+		filled = 0
+	}
+	
 	empty := width - filled
+	// 确保empty不为负数
+	if empty < 0 {
+		empty = 0
+	}
 	
 	if !c.Enabled {
 		return fmt.Sprintf("[%s%s] %.1f%%", 

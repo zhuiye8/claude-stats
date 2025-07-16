@@ -4,9 +4,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org)
-[![Version](https://img.shields.io/badge/Version-v1.0.5-brightgreen.svg)](https://github.com/zhuiye8/claude-stats/releases)
+[![Version](https://img.shields.io/badge/Version-v1.0.6-brightgreen.svg)](https://github.com/zhuiye8/claude-stats/releases)
 
-> **🎉 v1.0.5重大更新**: 完全修复Claude Code JSONL格式解析问题，实现真实数据兼容！
+> **🚀 v1.0.6稳定版**: 修复进度条显示bug，现已完美支持真实Claude数据！
 
 > 专为Claude Code用户设计的终极统计工具，解决现有工具的所有痛点
 
@@ -283,6 +283,12 @@ go test -cover ./...
 4. **文档改进**: 改善文档和示例
 
 ## 📝 更新日志
+
+### v1.0.6 (2025-07-16) - 🚀 稳定版
+- 🐛 **修复进度条显示panic错误** - 解决负数Repeat count问题
+- 🛡️ 加强边界条件检查和错误处理
+- ✅ 完美支持真实Claude数据，无崩溃风险
+- 📊 确认token提取功能正常（支持大量缓存token数据）
 
 ### v1.0.5 (2025-07-16) - 🎉 重大修复版本
 - 🚀 **完全修复Claude Code JSONL格式解析问题**
