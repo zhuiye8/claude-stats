@@ -8,7 +8,6 @@ dist/
 build/
 
 # Go相关
-*.mod
 vendor/
 
 # 测试和覆盖率文件
