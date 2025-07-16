@@ -92,6 +92,16 @@ Write-Host "  1. 解压对应平台的压缩包"
 Write-Host "  2. 运行对应的二进制文件"
 Write-Host "  3. 享受强大的Claude使用统计功能！"
 
+# 提供全局安装选项
+Write-Host ""
+Write-Host "🌍 想要全局安装吗？" -ForegroundColor Green
+Write-Host "运行以下命令将 claude-stats 安装为全局命令：" -ForegroundColor White
+Write-Host "  ..\install-global.ps1" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "安装后可在任何位置使用：" -ForegroundColor White
+Write-Host "  claude-stats analyze" -ForegroundColor Yellow
+Write-Host "  claude-stats --version" -ForegroundColor Yellow
+
 # 清理环境变量
 Remove-Item Env:GOOS -ErrorAction SilentlyContinue
 Remove-Item Env:GOARCH -ErrorAction SilentlyContinue 

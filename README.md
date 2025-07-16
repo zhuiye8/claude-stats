@@ -4,9 +4,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org)
-[![Version](https://img.shields.io/badge/Version-v1.0.6-brightgreen.svg)](https://github.com/zhuiye8/claude-stats/releases)
+[![Version](https://img.shields.io/badge/Version-v1.0.7-brightgreen.svg)](https://github.com/zhuiye8/claude-stats/releases)
 
-> **🚀 v1.0.6稳定版**: 修复进度条显示bug，现已完美支持真实Claude数据！
+> **🌍 v1.0.7全局版**: 新增一键全局安装，像Claude Code一样在任何位置使用！
 
 > 专为Claude Code用户设计的终极统计工具，解决现有工具的所有痛点
 
@@ -34,7 +34,7 @@
 
 ## 🚀 快速开始
 
-### 本地构建（推荐）
+### 🌍 一键全局安装（推荐）
 
 #### Windows用户
 ```powershell
@@ -42,11 +42,12 @@
 git clone https://github.com/zhuiye8/claude-stats.git
 cd claude-stats
 
-# 2. 构建
-.\build-local.ps1
+# 2. 一键安装为全局命令
+.\install.ps1
 
-# 3. 运行
-.\build\claude-stats-windows-amd64.exe analyze
+# 3. 在任何位置使用
+claude-stats analyze
+claude-stats --version
 ```
 
 #### Linux/macOS用户
@@ -55,14 +56,43 @@ cd claude-stats
 git clone https://github.com/zhuiye8/claude-stats.git
 cd claude-stats
 
-# 2. 构建
+# 2. 一键安装为全局命令
+./install.sh
+
+# 3. 在任何位置使用
+claude-stats analyze
+claude-stats --version
+```
+
+### 📦 分步安装（高级用户）
+
+#### Windows用户
+```powershell
+# 1. 克隆并构建
+git clone https://github.com/zhuiye8/claude-stats.git
+cd claude-stats
+.\build-local.ps1
+
+# 2. 安装为全局命令
+.\install-global.ps1
+
+# 3. 或直接运行
+.\build\claude-stats-windows-amd64.exe analyze
+```
+
+#### Linux/macOS用户
+```bash
+# 1. 克隆并构建
+git clone https://github.com/zhuiye8/claude-stats.git
+cd claude-stats
 ./build-local.sh
 
-# 3. 运行 (Linux)
-./build/claude-stats-linux-amd64 analyze
+# 2. 安装为全局命令
+./install-global.sh
 
-# 3. 运行 (macOS)
-./build/claude-stats-darwin-amd64 analyze
+# 3. 或直接运行
+./build/claude-stats-linux-amd64 analyze  # Linux
+./build/claude-stats-darwin-amd64 analyze # macOS
 ```
 
 #### 快速单平台构建
@@ -81,26 +111,64 @@ go build -o claude-stats .
 
 ## 📖 使用指南
 
-### 基础使用
+### 🎯 全局命令使用（推荐）
+
+安装为全局命令后，您可以在任何位置使用：
 
 ```bash
 # 自动分析默认Claude目录
-./claude-stats analyze
+claude-stats analyze
 
 # 分析指定目录
-./claude-stats analyze ~/claude-logs
+claude-stats analyze ~/claude-logs
 
 # 查看详细信息
-./claude-stats analyze --details
+claude-stats analyze --details
 
 # 导出JSON报告
-./claude-stats analyze --format json --output report.json
+claude-stats analyze --format json --output report.json
 
 # 按日期范围过滤
-./claude-stats analyze --start 2025-07-01 --end 2025-07-16
+claude-stats analyze --start 2025-07-01 --end 2025-07-16
 
 # 按模型过滤
-./claude-stats analyze --model sonnet
+claude-stats analyze --model sonnet
+
+# 查看版本和帮助
+claude-stats --version
+claude-stats --help
+```
+
+### 🗑️ 卸载管理
+
+#### Windows卸载
+```powershell
+# 卸载全局命令
+.\install-global.ps1 -Uninstall
+
+# 或者手动删除
+Remove-Item "$env:USERPROFILE\.local\bin\claude-stats.exe"
+```
+
+#### Linux/macOS卸载
+```bash
+# 卸载全局命令
+./install-global.sh --uninstall
+
+# 或者手动删除
+rm -f ~/.local/bin/claude-stats
+```
+
+### 🔧 本地运行（未安装全局命令）
+
+```bash
+# 使用构建后的二进制文件
+./build/claude-stats-windows-amd64.exe analyze   # Windows
+./build/claude-stats-linux-amd64 analyze        # Linux
+./build/claude-stats-darwin-amd64 analyze       # macOS
+
+# 或使用go直接运行
+go run . analyze
 ```
 
 ### 命令行选项
@@ -283,6 +351,14 @@ go test -cover ./...
 4. **文档改进**: 改善文档和示例
 
 ## 📝 更新日志
+
+### v1.0.7 (2025-07-16) - 🌍 全局安装版
+- 🚀 **新增一键全局安装功能** - 像Claude Code一样在任何位置使用
+- 📜 新增全局安装脚本 (install-global.ps1/sh)
+- ⚡ 新增一键安装脚本 (install.ps1/sh) 集成构建+安装
+- 🗑️ 支持全局卸载功能
+- 📖 更新文档，优先推荐全局安装方式
+- 🔧 构建脚本集成安装提示
 
 ### v1.0.6 (2025-07-16) - 🚀 稳定版
 - 🐛 **修复进度条显示panic错误** - 解决负数Repeat count问题
