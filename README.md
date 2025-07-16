@@ -4,6 +4,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org)
+[![Version](https://img.shields.io/badge/Version-v1.0.5-brightgreen.svg)](https://github.com/zhuiye8/claude-stats/releases)
+
+> **🎉 v1.0.5重大更新**: 完全修复Claude Code JSONL格式解析问题，实现真实数据兼容！
 
 > 专为Claude Code用户设计的终极统计工具，解决现有工具的所有痛点
 
@@ -280,6 +283,24 @@ go test -cover ./...
 4. **文档改进**: 改善文档和示例
 
 ## 📝 更新日志
+
+### v1.0.5 (2025-07-16) - 🎉 重大修复版本
+- 🚀 **完全修复Claude Code JSONL格式解析问题**
+- 🔧 重新设计数据结构，匹配真实Claude Code日志格式
+- 📊 实现智能token统计和估算功能
+- ✅ 解析成功率提升至83%+
+- 🎯 新增消息类型统计（user/assistant/summary）
+- 📈 添加解析状态监控和token提取率显示
+- 🛠️ 修复长行解析和缓冲区问题
+- 📁 新增项目级统计和分组功能
+
+### v1.0.4-debug (2025-07-16)
+- 🐛 添加调试模式分析JSONL格式问题
+- 🔍 实现详细的数据结构调试输出
+
+### v1.0.3 (2025-07-16) 
+- 🔧 修复长行解析错误（增加缓冲区至10MB）
+- 📂 改善大文件处理能力
 
 ### v1.0.2 (2025-07-16)
 - 🔧 简化为本地构建模式

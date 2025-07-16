@@ -153,4 +153,6 @@ func (c *ColorSettings) ProgressBar(current, total int, width int) string {
 		BrightGreen, strings.Repeat("█", filled),
 		Dim, strings.Repeat("░", empty),
 		BrightYellow, percentage*100, Reset)
-} 
+}
+
+ 

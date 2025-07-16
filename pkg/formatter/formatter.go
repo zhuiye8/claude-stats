@@ -184,6 +184,21 @@ func (f *Formatter) writeBasicInfo(output *strings.Builder, stats *models.UsageS
 	output.WriteString(fmt.Sprintf("   总会话数: %s\n", f.Colors.BrightYellow(formatNumber(stats.TotalSessions))))
 	output.WriteString(fmt.Sprintf("   总消息数: %s\n", f.Colors.BrightCyan(formatNumber(stats.TotalMessages))))
 	
+	// 新增：Claude Code 特定信息
+	if stats.ParsedMessages > 0 {
+		parseRate := float64(stats.ParsedMessages) * 100 / float64(stats.TotalMessages)
+		output.WriteString(fmt.Sprintf("   解析成功: %s (%s)\n", 
+			f.Colors.BrightGreen(formatNumber(stats.ParsedMessages)),
+			f.Colors.Cyan(fmt.Sprintf("%.1f%%", parseRate))))
+	}
+	
+	if stats.ExtractedTokens > 0 {
+		extractRate := float64(stats.ExtractedTokens) * 100 / float64(stats.TotalMessages)
+		output.WriteString(fmt.Sprintf("   Token提取: %s (%s)\n", 
+			f.Colors.BrightGreen(formatNumber(stats.ExtractedTokens)),
+			f.Colors.Cyan(fmt.Sprintf("%.1f%%", extractRate))))
+	}
+	
 	if !stats.AnalysisPeriod.StartTime.IsZero() {
 		timeRange := fmt.Sprintf("%s 至 %s", 
 			stats.AnalysisPeriod.StartTime.Format("2006-01-02 15:04"),
@@ -191,7 +206,31 @@ func (f *Formatter) writeBasicInfo(output *strings.Builder, stats *models.UsageS
 		output.WriteString(fmt.Sprintf("   分析时段: %s\n", f.Colors.Info(timeRange)))
 		output.WriteString(fmt.Sprintf("   持续时间: %s\n", f.Colors.Info(stats.AnalysisPeriod.Duration)))
 	}
+	
+	// 显示消息类型分布
+	if len(stats.MessageTypes) > 0 {
+		output.WriteString(fmt.Sprintf("   消息类型: %s\n", f.formatMessageTypes(stats.MessageTypes)))
+	}
+	
 	output.WriteString("\n")
+}
+
+// formatMessageTypes 格式化消息类型统计
+func (f *Formatter) formatMessageTypes(messageTypes map[string]int) string {
+	var parts []string
+	for msgType, count := range messageTypes {
+		color := BrightBlue
+		switch msgType {
+		case "user":
+			color = BrightGreen
+		case "assistant":
+			color = BrightMagenta
+		case "summary":
+			color = BrightYellow
+		}
+		parts = append(parts, f.Colors.Colorize(fmt.Sprintf("%s:%d", msgType, count), color))
+	}
+	return strings.Join(parts, ", ")
 }
 
 // writeTotalStats 写入总体统计
@@ -250,6 +289,14 @@ func (f *Formatter) writeTotalStats(output *strings.Builder, stats *models.Usage
 				readBar,
 			})
 		}
+	} else {
+		// 如果没有token数据，显示提示信息
+		t.AppendRow(table.Row{
+			f.Colors.Warning("⚠️ 暂无Token数据"), 
+			f.Colors.Dim("请检查JSONL格式"),
+			f.Colors.Dim("--"),
+			f.Colors.Dim("--"),
+		})
 	}
 
 	t.AppendFooter(table.Row{
@@ -365,6 +412,11 @@ func (f *Formatter) writeCostAnalysis(output *strings.Builder, stats *models.Usa
 
 // writeDetailedStats 写入详细统计
 func (f *Formatter) writeDetailedStats(output *strings.Builder, stats *models.UsageStats) {
+	// 项目统计
+	if len(stats.ProjectStats) > 0 {
+		f.writeProjectStats(output, stats)
+	}
+
 	// 按日期统计
 	if len(stats.DailyStats) > 0 {
 		f.writeDailyStats(output, stats)
@@ -374,6 +426,45 @@ func (f *Formatter) writeDetailedStats(output *strings.Builder, stats *models.Us
 	if len(stats.SessionStats) > 0 && len(stats.SessionStats) <= 20 {
 		f.writeSessionStats(output, stats)
 	}
+}
+
+// writeProjectStats 写入项目统计
+func (f *Formatter) writeProjectStats(output *strings.Builder, stats *models.UsageStats) {
+	t := table.NewWriter()
+	t.SetTitle("📁 项目统计")
+	t.AppendHeader(table.Row{"项目", "路径", "Token数", "最后活动"})
+
+	// 按Token数排序
+	type projectStat struct {
+		name string
+		info models.ProjectStats
+	}
+	
+	var projectStats []projectStat
+	for name, info := range stats.ProjectStats {
+		projectStats = append(projectStats, projectStat{name, info})
+	}
+	
+	sort.Slice(projectStats, func(i, j int) bool {
+		return projectStats[i].info.Tokens.GetTotalTokens() > projectStats[j].info.Tokens.GetTotalTokens()
+	})
+
+	for _, ps := range projectStats {
+		shortPath := ps.info.ProjectPath
+		if len(shortPath) > 40 {
+			shortPath = "..." + shortPath[len(shortPath)-37:]
+		}
+		
+		t.AppendRow(table.Row{
+			ps.name,
+			shortPath,
+			formatNumber(ps.info.Tokens.GetTotalTokens()),
+			ps.info.LastActivity.Format("01-02 15:04"),
+		})
+	}
+
+	t.SetStyle(table.StyleColoredBright)
+	output.WriteString(t.Render() + "\n\n")
 }
 
 // writeDailyStats 写入每日统计

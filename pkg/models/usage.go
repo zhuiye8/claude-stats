@@ -4,17 +4,41 @@ import (
 	"time"
 )
 
-// ConversationEntry 代表JSONL文件中的一条记录
+// ConversationEntry 代表Claude Code JSONL文件中的一条记录
 type ConversationEntry struct {
-	ID          string                 `json:"id"`
+	// Claude Code 实际字段
 	Type        string                 `json:"type"`
 	Timestamp   time.Time              `json:"timestamp"`
-	SessionID   string                 `json:"session_id,omitempty"`
-	Model       string                 `json:"model,omitempty"`
-	Usage       *TokenUsage            `json:"usage,omitempty"`
-	Message     *Message               `json:"message,omitempty"`
-	Content     []Content              `json:"content,omitempty"`
+	SessionID   string                 `json:"sessionId,omitempty"`
+	UUID        string                 `json:"uuid,omitempty"`
+	ParentUUID  string                 `json:"parentUuid,omitempty"`
+	UserType    string                 `json:"userType,omitempty"`
+	IsSidechain bool                   `json:"isSidechain,omitempty"`
+	IsMeta      bool                   `json:"isMeta,omitempty"`
+	CWD         string                 `json:"cwd,omitempty"`
+	Version     string                 `json:"version,omitempty"`
+	RequestID   string                 `json:"requestId,omitempty"`
+	
+	// 消息内容 - 注意：这里可能是字符串或复杂对象
+	Message     interface{}            `json:"message,omitempty"`
+	
+	// 用于项目分组的路径信息
+	Summary     string                 `json:"summary,omitempty"`
+	LeafUUID    string                 `json:"leafUuid,omitempty"`
+	
+	// 解析后的信息
+	ParsedMessage *ParsedMessage        `json:"-"` // 不序列化，仅内部使用
+	ExtractedUsage *TokenUsage          `json:"-"` // 从消息中提取的token信息
+	
 	RawData     map[string]interface{} `json:"-"` // 存储原始数据以处理未知字段
+}
+
+// ParsedMessage 代表解析后的消息内容
+type ParsedMessage struct {
+	Role     string      `json:"role,omitempty"`
+	Content  interface{} `json:"content,omitempty"` // 可能是字符串或复杂结构
+	Model    string      `json:"model,omitempty"`
+	Usage    *TokenUsage `json:"usage,omitempty"`
 }
 
 // TokenUsage 代表token使用情况
@@ -26,17 +50,10 @@ type TokenUsage struct {
 	TotalTokens             int `json:"total_tokens,omitempty"`
 }
 
-// Message 代表消息内容
-type Message struct {
-	Role    string    `json:"role"`
-	Content []Content `json:"content"`
-}
-
-// Content 代表消息内容项
+// Content 代表消息内容项（兼容性保留）
 type Content struct {
 	Type string `json:"type"`
 	Text string `json:"text,omitempty"`
-	// 可能包含其他类型的内容，如图片等
 }
 
 // UsageStats 代表统计结果
@@ -50,6 +67,12 @@ type UsageStats struct {
 	EstimatedCost       CostBreakdown          `json:"estimated_cost"`
 	AnalysisPeriod      Period                 `json:"analysis_period"`
 	DetectedMode        string                 `json:"detected_mode"` // "api" 或 "subscription"
+	
+	// 新增：Claude Code 特定统计
+	ProjectStats        map[string]ProjectStats `json:"project_stats"`
+	MessageTypes        map[string]int          `json:"message_types"`
+	ParsedMessages      int                     `json:"parsed_messages"`
+	ExtractedTokens     int                     `json:"extracted_tokens"`
 }
 
 // SessionInfo 代表会话信息
