@@ -11,7 +11,6 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/zhuiye8/claude-stats/pkg/models"
-	"github.com/zhuiye8/claude-stats/pkg/parser"
 )
 
 // Formatter 用于格式化输出
@@ -425,44 +424,57 @@ func (f *Formatter) writeCostAnalysis(output *strings.Builder, stats *models.Usa
 	// 订阅模式建议
 	if stats.DetectedMode == "subscription" {
 		output.WriteString("\n")
-		suggestionTitle := f.Colors.IconHeader("🎯", "订阅优化建议", BrightMagenta)
+		suggestionTitle := f.Colors.IconHeader("🎯", "订阅使用建议", BrightMagenta)
 		output.WriteString(fmt.Sprintf("%s\n", suggestionTitle))
+		
+		output.WriteString(fmt.Sprintf("   ⚠️  %s\n", 
+			f.Colors.Warning("以下建议基于估算数据，请结合实际使用情况判断")))
+		output.WriteString("\n")
 		
 		if stats.SubscriptionQuota != nil {
 			quota := stats.SubscriptionQuota
 			
-			// 使用率建议
-			if quota.UsagePercentage > 90 {
-				output.WriteString(fmt.Sprintf("   ⚠️  %s\n", f.Colors.Warning("当前窗口即将用完，建议升级计划")))
+			// 通用使用建议
+			output.WriteString(fmt.Sprintf("   💡 %s\n", 
+				f.Colors.Info("效率提升技巧：")))
+			output.WriteString(fmt.Sprintf("      • 使用 %s 清理上下文\n", f.Colors.BrightCyan("/compact")))
+			output.WriteString(fmt.Sprintf("      • 使用 %s 重置对话\n", f.Colors.BrightCyan("/clear")))
+			output.WriteString(fmt.Sprintf("      • 使用 %s 查看实时限额\n", f.Colors.BrightCyan("/status")))
+			
+			// 基于使用率的建议
+			if quota.UsagePercentage > 80 {
+				output.WriteString(fmt.Sprintf("\n   ⚠️  %s\n", 
+					f.Colors.Warning("当前窗口使用率较高")))
+				output.WriteString(fmt.Sprintf("      • 考虑使用 %s 减少上下文\n", f.Colors.BrightCyan("/compact")))
+				output.WriteString(fmt.Sprintf("      • 避免长时间连续对话\n"))
 				if quota.Plan == "Pro" {
-					output.WriteString(fmt.Sprintf("   💡 考虑升级到 %s (5倍限额)\n", f.Colors.BrightYellow("Max 5×")))
+					output.WriteString(fmt.Sprintf("      • 如经常遇到限制，可考虑升级计划\n"))
 				}
-			} else if quota.UsagePercentage < 30 {
-				output.WriteString(fmt.Sprintf("   ✅ %s\n", f.Colors.Success("当前计划使用充裕")))
-				if quota.Plan != "Pro" {
-					output.WriteString(fmt.Sprintf("   💡 可考虑降级到 %s 节省成本\n", f.Colors.BrightGreen("Pro 计划")))
-				}
-			} else {
-				output.WriteString(fmt.Sprintf("   ✅ %s\n", f.Colors.Info("当前计划使用合理")))
+			} else if quota.UsagePercentage < 20 {
+				output.WriteString(fmt.Sprintf("\n   ✅ %s\n", 
+					f.Colors.Success("当前窗口使用充裕")))
+				output.WriteString(fmt.Sprintf("      • 当前计划适合您的使用模式\n"))
 			}
 			
-			// 效率提示
-			output.WriteString(fmt.Sprintf("   💡 使用 %s 和 %s 可延长限额\n", 
-				f.Colors.BrightCyan("/compact"), f.Colors.BrightCyan("/clear")))
+			// 时区相关建议
+			output.WriteString(fmt.Sprintf("\n   🌍 %s\n", 
+				f.Colors.Info("时区注意事项：")))
+			output.WriteString(fmt.Sprintf("      • Claude Code限额可能基于UTC时区\n"))
+			output.WriteString(fmt.Sprintf("      • 重置时间可能与您的本地时间不同\n"))
+			output.WriteString(fmt.Sprintf("      • 建议使用 %s 确认准确时间\n", f.Colors.BrightCyan("/status")))
 			
-			// 成本效益分析
+			// 成本效益信息
 			apiEquivalentCost := cost.TotalCost
 			planCost := getPlanCostFloat(quota.Plan)
-			if apiEquivalentCost > planCost*2 {
+			if apiEquivalentCost > planCost {
 				savings := apiEquivalentCost - planCost
-				output.WriteString(fmt.Sprintf("   💰 订阅模式节省: %s (相比API付费)\n", 
-					f.Colors.Success(fmt.Sprintf("$%.2f/月", savings))))
+				output.WriteString(fmt.Sprintf("\n   💰 %s\n", 
+					f.Colors.Success(fmt.Sprintf("订阅模式相比API节省约 $%.2f/月", savings))))
 			}
 		} else {
 			// 兜底建议
-			costCalculator := parser.NewCostCalculator()
-			analysis := costCalculator.GetSubscriptionEquivalent(stats)
-			output.WriteString(fmt.Sprintf("   建议计划: %s\n", f.Colors.BrightGreen(analysis.RecommendedPlan)))
+			output.WriteString(fmt.Sprintf("   💡 %s\n", f.Colors.Info("建议在Claude Code中使用 /status 查看详细限额信息")))
+			output.WriteString(fmt.Sprintf("   📚 %s\n", f.Colors.Dim("参考官方文档了解订阅计划详情")))
 		}
 	}
 	
@@ -475,6 +487,12 @@ func (f *Formatter) writeSubscriptionQuota(output *strings.Builder, stats *model
 	sectionTitle := f.Colors.IconHeader("⚙️", "订阅限额状态", BrightMagenta)
 	output.WriteString(fmt.Sprintf("%s\n", sectionTitle))
 	
+	// 数据准确性警告
+	output.WriteString(fmt.Sprintf("   ⚠️  %s\n", 
+		f.Colors.Warning("注意：以下数据为估算值，实际限额请使用Claude Code的 /status 命令查看")))
+	output.WriteString(fmt.Sprintf("   💡 %s\n\n", 
+		f.Colors.Dim("在Claude Code中运行 /status 可获取准确的当前窗口使用情况")))
+	
 	// 计划信息卡片
 	planColor := BrightBlue
 	planEmoji := "🥉"
@@ -486,15 +504,15 @@ func (f *Formatter) writeSubscriptionQuota(output *strings.Builder, stats *model
 		planEmoji = "🥈"
 	}
 	
-	output.WriteString(fmt.Sprintf("   %s 当前计划: %s (%s)\n", 
+	output.WriteString(fmt.Sprintf("   %s 推测计划: %s (%s)\n", 
 		planEmoji,
 		f.Colors.Colorize(quota.Plan, planColor),
 		f.Colors.Dim(fmt.Sprintf("$%s/月", getPlanPrice(quota.Plan)))))
 	
 	// 窗口信息
-	output.WriteString(fmt.Sprintf("   🕐 限额窗口: %s (%s)\n", 
+	output.WriteString(fmt.Sprintf("   🕐 限额机制: %s窗口 (%s)\n", 
 		f.Colors.Info(quota.WindowDuration),
-		f.Colors.Dim("每天4个窗口")))
+		f.Colors.Dim("每天4个窗口，可能基于UTC时区")))
 	
 	// 使用情况进度条
 	usageColor := BrightGreen
@@ -512,12 +530,12 @@ func (f *Formatter) writeSubscriptionQuota(output *strings.Builder, stats *model
 	filledLength := int(float64(barLength) * quota.UsagePercentage / 100.0)
 	progressBar := strings.Repeat("█", filledLength) + strings.Repeat("░", barLength-filledLength)
 	
-	output.WriteString(fmt.Sprintf("   %s 当前窗口: %s / %s 消息\n",
+	output.WriteString(fmt.Sprintf("   %s 估算使用: %s / %s 消息\n",
 		usageEmoji,
 		f.Colors.Colorize(formatNumber(quota.EstimatedUsed), usageColor),
 		f.Colors.BrightCyan(formatNumber(quota.MessagesPerWindow))))
 	
-	output.WriteString(fmt.Sprintf("   📊 使用进度: [%s] %s\n",
+	output.WriteString(fmt.Sprintf("   📊 估算进度: [%s] %s\n",
 		f.Colors.Colorize(progressBar, usageColor),
 		f.Colors.Colorize(fmt.Sprintf("%.1f%%", quota.UsagePercentage), usageColor)))
 	
@@ -529,11 +547,11 @@ func (f *Formatter) writeSubscriptionQuota(output *strings.Builder, stats *model
 		} else if quota.EstimatedRemaining < 20 {
 			remainingColor = BrightYellow
 		}
-		output.WriteString(fmt.Sprintf("   ✨ 剩余消息: %s\n", 
+		output.WriteString(fmt.Sprintf("   ✨ 估算剩余: %s\n", 
 			f.Colors.Colorize(formatNumber(quota.EstimatedRemaining), remainingColor)))
 	} else {
-		output.WriteString(fmt.Sprintf("   ❌ 剩余消息: %s\n", 
-			f.Colors.BrightRed("已用完，等待重置")))
+		output.WriteString(fmt.Sprintf("   ❌ 估算剩余: %s\n", 
+			f.Colors.BrightRed("可能已用完")))
 	}
 	
 	// 当前模型
@@ -543,7 +561,7 @@ func (f *Formatter) writeSubscriptionQuota(output *strings.Builder, stats *model
 		modelIcon = "⚡"
 		modelDesc = "标准模型"
 	}
-	output.WriteString(fmt.Sprintf("   %s 当前模型: %s (%s)\n", 
+	output.WriteString(fmt.Sprintf("   %s 推测模型: %s (%s)\n", 
 		modelIcon, 
 		f.Colors.BrightBlue(quota.CurrentModel),
 		f.Colors.Dim(modelDesc)))
@@ -555,13 +573,26 @@ func (f *Formatter) writeSubscriptionQuota(output *strings.Builder, stats *model
 		if timeUntilReset < time.Hour {
 			resetColor = BrightYellow
 		}
-		output.WriteString(fmt.Sprintf("   ⏳ 重置时间: %s (%s)\n", 
+		
+		// 显示当前系统时区
+		_, offset := time.Now().Zone()
+		timezone := fmt.Sprintf("UTC%+d", offset/3600)
+		
+		output.WriteString(fmt.Sprintf("   ⏳ 预测重置: %s (%s) [%s]\n", 
 			f.Colors.Dim(quota.NextResetTime.Format("15:04")),
-			f.Colors.Colorize(formatDuration(timeUntilReset), resetColor)))
+			f.Colors.Colorize(formatDuration(timeUntilReset), resetColor),
+			f.Colors.Dim(timezone)))
 	} else {
 		output.WriteString(fmt.Sprintf("   🔄 重置状态: %s\n", 
-			f.Colors.BrightGreen("已可重置")))
+			f.Colors.BrightGreen("应该已重置")))
 	}
+	
+	// 使用建议
+	output.WriteString("\n")
+	output.WriteString(fmt.Sprintf("   💡 %s\n", 
+		f.Colors.Info("获取准确信息：在Claude Code中运行 /status 命令")))
+	output.WriteString(fmt.Sprintf("   🔧 %s\n", 
+		f.Colors.Dim("如果重置时间不准确，请反馈给开发者")))
 	
 	output.WriteString("\n")
 }

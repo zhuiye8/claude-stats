@@ -180,50 +180,61 @@ func (u *UsageStats) EstimateSubscriptionQuota() *SubscriptionQuota {
 		}
 	}
 	
-	// 估算当前5小时窗口的使用情况
-	// 假设分析时段的最后5小时为当前窗口
-	var recentMessages int
-	if !u.AnalysisPeriod.EndTime.IsZero() {
-		// 简单估算：如果分析时段小于5小时，就用全部消息
-		duration := u.AnalysisPeriod.EndTime.Sub(u.AnalysisPeriod.StartTime)
-		if duration.Hours() <= 5 {
-			recentMessages = u.TotalMessages
-		} else {
-			// 否则按比例估算最近5小时的消息数
-			recentMessages = int(float64(u.TotalMessages) * 5.0 / duration.Hours())
-		}
-	} else {
-		// 如果没有时间信息，假设所有消息都在当前窗口
-		recentMessages = u.TotalMessages
+	// 获取系统时区和当前时间
+	now := time.Now()
+	
+	// 估算使用情况 - 注意：这些数据可能不准确
+	// 真实的使用情况应该通过 /status 命令获取
+	estimatedUsed := int(float64(u.TotalMessages) * 0.3) // 保守估算30%
+	if estimatedUsed > messagesPerWindow {
+		estimatedUsed = messagesPerWindow
 	}
 	
 	// 计算剩余消息数
-	remaining := messagesPerWindow - recentMessages
+	remaining := messagesPerWindow - estimatedUsed
 	if remaining < 0 {
 		remaining = 0
 	}
 	
 	// 计算使用百分比
-	usagePercentage := float64(recentMessages) * 100.0 / float64(messagesPerWindow)
+	usagePercentage := float64(estimatedUsed) * 100.0 / float64(messagesPerWindow)
 	if usagePercentage > 100 {
 		usagePercentage = 100
 	}
 	
 	// 确定当前模型
 	currentModel := "Claude 4 Sonnet"
-	if recentMessages <= modelSwitchPoint {
+	if estimatedUsed <= modelSwitchPoint {
 		currentModel = "Claude 4 Opus"
 	}
 	
-	// 估算下次重置时间（5小时窗口）
-	nextReset := time.Now().Add(time.Hour * 5)
-	if !u.AnalysisPeriod.EndTime.IsZero() {
-		// 基于最后活动时间估算
-		lastActivity := u.AnalysisPeriod.EndTime
-		timeSinceLastActivity := time.Since(lastActivity)
-		if timeSinceLastActivity < time.Hour*5 {
-			nextReset = lastActivity.Add(time.Hour * 5)
+	// 重置时间计算 - 基于整点重置机制
+	// 根据调研，Claude Code可能使用固定的整点重置时间
+	var nextReset time.Time
+	
+	// 方法1：假设每5小时整点重置 (需要验证)
+	// 可能的重置时间点: 00:00, 05:00, 10:00, 15:00, 20:00 UTC
+	resetHours := []int{0, 5, 10, 15, 20}
+	
+	// 转换到UTC时间进行计算
+	utcNow := now.UTC()
+	
+	// 找到下一个重置时间点
+	for _, resetHour := range resetHours {
+		potentialReset := time.Date(utcNow.Year(), utcNow.Month(), utcNow.Day(), 
+			resetHour, 0, 0, 0, time.UTC)
+		
+		if potentialReset.After(utcNow) {
+			nextReset = potentialReset.In(now.Location()) // 转换回用户时区
+			break
 		}
+	}
+	
+	// 如果今天没有找到，使用明天的第一个重置时间
+	if nextReset.IsZero() {
+		tomorrow := utcNow.AddDate(0, 0, 1)
+		nextReset = time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(),
+			resetHours[0], 0, 0, 0, time.UTC).In(now.Location())
 	}
 	
 	return &SubscriptionQuota{
@@ -231,7 +242,7 @@ func (u *UsageStats) EstimateSubscriptionQuota() *SubscriptionQuota {
 		WindowDuration:     "5小时",
 		WindowsPerDay:      4,
 		MessagesPerWindow:  messagesPerWindow,
-		EstimatedUsed:      recentMessages,
+		EstimatedUsed:      estimatedUsed,
 		EstimatedRemaining: remaining,
 		NextResetTime:      nextReset,
 		UsagePercentage:    usagePercentage,
