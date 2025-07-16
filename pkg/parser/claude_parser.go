@@ -197,6 +197,19 @@ func (p *ClaudeParser) shouldInclude(entry *models.ConversationEntry) bool {
 func (p *ClaudeParser) processEntry(stats *models.UsageStats, entry *models.ConversationEntry) {
 	stats.TotalMessages++
 
+	// 调试：显示前几条记录的结构
+	if stats.TotalMessages <= 3 && p.Verbose {
+		fmt.Printf("🔍 调试信息 - 记录 #%d:\n", stats.TotalMessages)
+		fmt.Printf("  Type: %s\n", entry.Type)
+		fmt.Printf("  Model: %s\n", entry.Model)
+		fmt.Printf("  Usage: %+v\n", entry.Usage)
+		fmt.Printf("  RawData字段: %v\n", getMapKeys(entry.RawData))
+		if usageRaw, exists := entry.RawData["usage"]; exists {
+			fmt.Printf("  原始usage字段: %+v\n", usageRaw)
+		}
+		fmt.Println("  ---")
+	}
+
 	// 处理token使用情况
 	if entry.Usage != nil && !entry.Usage.IsEmpty() {
 		stats.TotalTokens.Add(*entry.Usage)
@@ -312,4 +325,13 @@ func (p *ClaudeParser) calculateCost(stats *models.UsageStats) {
 	// 使用Claude 3.5 Sonnet的定价作为默认
 	costCalculator := NewCostCalculator()
 	stats.EstimatedCost = costCalculator.Calculate(&stats.TotalTokens, stats.ModelStats, stats.DetectedMode == "subscription")
+}
+
+// getMapKeys 获取map的所有键（调试用）
+func getMapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 } 
