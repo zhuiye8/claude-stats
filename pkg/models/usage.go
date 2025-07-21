@@ -56,18 +56,14 @@ type Content struct {
 	Text string `json:"text,omitempty"`
 }
 
-// SubscriptionQuota 订阅模式限额信息
+// SubscriptionQuota 订阅限额信息
 type SubscriptionQuota struct {
-	Plan                string    `json:"plan"`                 // Pro, Max5x, Max20x
-	WindowDuration      string    `json:"window_duration"`      // "5小时"
-	WindowsPerDay       int       `json:"windows_per_day"`      // 4
-	MessagesPerWindow   int       `json:"messages_per_window"`  // 根据计划不同
-	EstimatedUsed       int       `json:"estimated_used"`       // 估算已使用
-	EstimatedRemaining  int       `json:"estimated_remaining"`  // 估算剩余
-	NextResetTime       time.Time `json:"next_reset_time"`      // 下次重置时间
-	UsagePercentage     float64   `json:"usage_percentage"`     // 使用百分比
-	ModelSwitchPoint    int       `json:"model_switch_point"`   // 从Opus切换到Sonnet的消息数
-	CurrentModel        string    `json:"current_model"`        // 当前预期使用的模型
+	Plan              string // 订阅计划: Pro, Max5x, Max20x
+	MessagesPerWindow int    // 每个窗口的消息限制
+	EstimatedUsed     int    // 估算已使用消息数
+	Remaining         int    // 估算剩余消息数
+	ModelSwitchPoint  int    // 模型切换点（20%处）
+	DebugInfo         map[string]interface{} `json:"debug_info,omitempty"` // 调试信息
 }
 
 // UsageStats 代表统计结果
@@ -88,7 +84,7 @@ type UsageStats struct {
 	ParsedMessages      int                     `json:"parsed_messages"`
 	ExtractedTokens     int                     `json:"extracted_tokens"`
 	
-	// 新增：订阅限额信息
+	// 订阅限额信息
 	SubscriptionQuota   *SubscriptionQuota     `json:"subscription_quota,omitempty"`
 }
 
@@ -133,6 +129,30 @@ type ProjectStats struct {
 	LastActivity time.Time  `json:"last_activity"`
 }
 
+// BillingBlock 代表5小时计费窗口
+type BillingBlock struct {
+	ID            string     `json:"id"`               // 窗口标识符
+	StartTime     time.Time  `json:"start_time"`       // 窗口开始时间
+	EndTime       time.Time  `json:"end_time"`         // 窗口结束时间 
+	ActualEndTime time.Time  `json:"actual_end_time"`  // 实际结束时间
+	IsActive      bool       `json:"is_active"`        // 是否为活跃窗口
+	TimeRemaining string     `json:"time_remaining"`   // 剩余时间
+	Models        []string   `json:"models"`           // 使用的模型
+	Tokens        TokenUsage `json:"tokens"`           // Token使用量
+	CostUSD       float64    `json:"cost_usd"`         // 成本
+	MessageCount  int        `json:"message_count"`    // 消息数量
+	BurnRate      int        `json:"burn_rate"`        // 燃烧速率(tokens/min)
+	ProjectedTotal int       `json:"projected_total"`  // 预测总量
+	ProjectedCost  float64   `json:"projected_cost"`   // 预测成本
+}
+
+// BlocksReport 代表blocks报告
+type BlocksReport struct {
+	Blocks   []BillingBlock `json:"blocks"`
+	Summary  TokenUsage     `json:"summary"`
+	TotalCost float64       `json:"total_cost"`
+}
+
 // GetTotalTokens 计算总token数
 func (u *TokenUsage) GetTotalTokens() int {
 	if u.TotalTokens > 0 {
@@ -162,91 +182,137 @@ func (u *UsageStats) EstimateSubscriptionQuota() *SubscriptionQuota {
 		return nil
 	}
 	
-	// 根据总成本估算计划类型
-	plan := "Pro"
-	messagesPerWindow := 45
-	modelSwitchPoint := 9  // 20%的消息数使用Opus
-	
-	// 如果成本很高，可能是Max计划
-	if u.EstimatedCost.TotalCost > 50 {
-		if u.EstimatedCost.TotalCost > 150 {
-			plan = "Max20x"
-			messagesPerWindow = 900
-			modelSwitchPoint = 180
-		} else {
-			plan = "Max5x" 
-			messagesPerWindow = 225
-			modelSwitchPoint = 45
+	// 只计算用户消息数作为真实请求数
+	userMessages := 0
+	if u.MessageTypes != nil {
+		if count, exists := u.MessageTypes["user"]; exists {
+			userMessages = count
 		}
 	}
 	
-	// 获取系统时区和当前时间
-	now := time.Now()
-	
-	// 估算使用情况 - 注意：这些数据可能不准确
-	// 真实的使用情况应该通过 /status 命令获取
-	estimatedUsed := int(float64(u.TotalMessages) * 0.3) // 保守估算30%
-	if estimatedUsed > messagesPerWindow {
-		estimatedUsed = messagesPerWindow
+	// 如果没有找到用户消息统计，使用估算
+	if userMessages == 0 {
+		// 假设用户消息占总消息的30-40%
+		userMessages = int(float64(u.TotalMessages) * 0.35)
 	}
 	
-	// 计算剩余消息数
-	remaining := messagesPerWindow - estimatedUsed
+	// 计算数据跨越的时间窗口数量
+	duration := u.AnalysisPeriod.EndTime.Sub(u.AnalysisPeriod.StartTime)
+	windowCount := int(duration.Hours()/5) + 1 // 每5小时一个窗口
+	if windowCount < 1 {
+		windowCount = 1
+	}
+	
+	// 基于成本和用户消息数推断计划类型
+	plan := "Pro"
+	messagesPerWindow := 45
+	modelSwitchPoint := 9
+	
+	// 智能计划检测：同时考虑成本和消息数模式
+	avgMessagesPerWindow := float64(userMessages) / float64(windowCount)
+	
+	// 关键逻辑：基于平均使用量反推真实的计划限制
+	// 特别注意：如果数据是工作期间保存的，可能不完整
+	
+	// 重要修正：如果平均使用量很高，可能说明用户是小计划但经常达到限额
+	if avgMessagesPerWindow > 500 {
+		// 极高使用量，肯定是Max20x
+		plan = "Max20x"
+		messagesPerWindow = 900
+		modelSwitchPoint = 180
+	} else if avgMessagesPerWindow > 250 {
+		// 高使用量，可能是Max5x
+		plan = "Max5x"
+		messagesPerWindow = 225
+		modelSwitchPoint = 45
+	} else if avgMessagesPerWindow > 60 {
+		// 中等使用量，可能是小计划用户经常达到限额
+		// 关键假设：如果平均使用量远超Pro限制(45条)，很可能是Pro用户经常限额
+		if avgMessagesPerWindow > 300 && u.EstimatedCost.TotalCost > 250 {
+			// 极高使用量且高成本，可能是Max5x
+			plan = "Max5x"
+			messagesPerWindow = 225
+			modelSwitchPoint = 45
+		} else {
+			// 中高使用量，更可能是Pro用户经常达到45条限制
+			// 特别是如果数据跨越多个窗口（工作期间保存）
+			plan = "Pro"
+			messagesPerWindow = 45
+			modelSwitchPoint = 9
+		}
+	} else if avgMessagesPerWindow > 30 {
+		// 中低使用量，基于成本判断
+		if u.EstimatedCost.TotalCost > 80 {
+			plan = "Max5x"
+			messagesPerWindow = 225
+			modelSwitchPoint = 45
+		} else {
+			plan = "Pro"
+			messagesPerWindow = 45
+			modelSwitchPoint = 9
+		}
+	} else {
+		// 低使用量，很可能是Pro用户
+		plan = "Pro"
+		messagesPerWindow = 45
+		modelSwitchPoint = 9
+	}
+	
+	// 智能推断当前窗口使用情况
+	// 特别考虑：Pro用户平均234条/窗口说明经常达到45条限制
+	
+	var currentWindowUsed int
+	
+	// 情况分析：
+	if avgMessagesPerWindow >= float64(messagesPerWindow)*5 {
+		// 平均使用量是限制的5倍以上，用户肯定是重度用户，经常限额
+		currentWindowUsed = messagesPerWindow // 当前窗口已满
+	} else if avgMessagesPerWindow >= float64(messagesPerWindow)*3 {
+		// 平均使用量是限制的3倍以上，用户经常达到限额
+		currentWindowUsed = messagesPerWindow // 当前窗口已满  
+	} else if avgMessagesPerWindow >= float64(messagesPerWindow)*2 {
+		// 平均使用量是限制的2倍以上，用户很可能当前已限额
+		currentWindowUsed = messagesPerWindow // 当前窗口已满
+	} else if avgMessagesPerWindow >= float64(messagesPerWindow) {
+		// 平均使用量达到或超过计划限制，用户肯定经常限额
+		currentWindowUsed = messagesPerWindow // 当前窗口已满
+	} else if avgMessagesPerWindow >= float64(messagesPerWindow)*0.9 {
+		// 平均使用量接近限制（90%+），用户很可能当前已限额
+		currentWindowUsed = messagesPerWindow // 当前窗口已满
+	} else if avgMessagesPerWindow >= float64(messagesPerWindow)*0.7 {
+		// 平均使用量较高（70-90%），用户当前可能接近限额
+		currentWindowUsed = int(float64(messagesPerWindow) * 0.95) // 95%使用率
+	} else if avgMessagesPerWindow >= float64(messagesPerWindow)*0.5 {
+		// 中度使用（50-70%），稍微高估当前使用
+		currentWindowUsed = int(avgMessagesPerWindow * 1.3)
+	} else {
+		// 轻度使用，使用平均值
+		currentWindowUsed = int(avgMessagesPerWindow)
+	}
+	
+	// 确保不超过限制
+	if currentWindowUsed > messagesPerWindow {
+		currentWindowUsed = messagesPerWindow
+	}
+	
+	// 计算剩余数量
+	remaining := messagesPerWindow - currentWindowUsed
 	if remaining < 0 {
 		remaining = 0
 	}
 	
-	// 计算使用百分比
-	usagePercentage := float64(estimatedUsed) * 100.0 / float64(messagesPerWindow)
-	if usagePercentage > 100 {
-		usagePercentage = 100
-	}
-	
-	// 确定当前模型
-	currentModel := "Claude 4 Sonnet"
-	if estimatedUsed <= modelSwitchPoint {
-		currentModel = "Claude 4 Opus"
-	}
-	
-	// 重置时间计算 - 基于整点重置机制
-	// 根据调研，Claude Code可能使用固定的整点重置时间
-	var nextReset time.Time
-	
-	// 方法1：假设每5小时整点重置 (需要验证)
-	// 可能的重置时间点: 00:00, 05:00, 10:00, 15:00, 20:00 UTC
-	resetHours := []int{0, 5, 10, 15, 20}
-	
-	// 转换到UTC时间进行计算
-	utcNow := now.UTC()
-	
-	// 找到下一个重置时间点
-	for _, resetHour := range resetHours {
-		potentialReset := time.Date(utcNow.Year(), utcNow.Month(), utcNow.Day(), 
-			resetHour, 0, 0, 0, time.UTC)
-		
-		if potentialReset.After(utcNow) {
-			nextReset = potentialReset.In(now.Location()) // 转换回用户时区
-			break
-		}
-	}
-	
-	// 如果今天没有找到，使用明天的第一个重置时间
-	if nextReset.IsZero() {
-		tomorrow := utcNow.AddDate(0, 0, 1)
-		nextReset = time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(),
-			resetHours[0], 0, 0, 0, time.UTC).In(now.Location())
-	}
-	
 	return &SubscriptionQuota{
-		Plan:               plan,
-		WindowDuration:     "5小时",
-		WindowsPerDay:      4,
-		MessagesPerWindow:  messagesPerWindow,
-		EstimatedUsed:      estimatedUsed,
-		EstimatedRemaining: remaining,
-		NextResetTime:      nextReset,
-		UsagePercentage:    usagePercentage,
-		ModelSwitchPoint:   modelSwitchPoint,
-		CurrentModel:       currentModel,
+		Plan:              plan,
+		MessagesPerWindow: messagesPerWindow,
+		EstimatedUsed:     currentWindowUsed,
+		Remaining:         remaining,
+		ModelSwitchPoint:  modelSwitchPoint,
+		// 添加调试信息
+		DebugInfo: map[string]interface{}{
+			"total_user_messages": userMessages,
+			"window_count":        windowCount,
+			"avg_per_window":      avgMessagesPerWindow,
+			"duration_hours":      duration.Hours(),
+		},
 	}
 } 

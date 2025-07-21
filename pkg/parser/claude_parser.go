@@ -623,6 +623,200 @@ func (p *ClaudeParser) calculateCost(stats *models.UsageStats) {
 	stats.EstimatedCost = costCalculator.Calculate(&stats.TotalTokens, stats.ModelStats, stats.DetectedMode == "subscription")
 }
 
+// FinalizeStats 完成统计数据的最终处理
+func (p *ClaudeParser) FinalizeStats(stats *models.UsageStats) {
+	p.calculatePeriod(stats)
+	p.calculateCost(stats)
+}
+
+// AnalyzeBlocks 分析5小时计费窗口
+func (p *ClaudeParser) AnalyzeBlocks(stats *models.UsageStats) (*models.BlocksReport, error) {
+	if len(stats.SessionStats) == 0 {
+		return &models.BlocksReport{
+			Blocks:    []models.BillingBlock{},
+			Summary:   stats.TotalTokens,
+			TotalCost: stats.EstimatedCost.TotalCost,
+		}, nil
+	}
+
+	// 收集所有活动时间点
+	var timePoints []time.Time
+	for _, session := range stats.SessionStats {
+		timePoints = append(timePoints, session.StartTime)
+		if !session.EndTime.IsZero() {
+			timePoints = append(timePoints, session.EndTime)
+		}
+	}
+
+	if len(timePoints) == 0 {
+		return &models.BlocksReport{
+			Blocks:    []models.BillingBlock{},
+			Summary:   stats.TotalTokens,
+			TotalCost: stats.EstimatedCost.TotalCost,
+		}, nil
+	}
+
+	// 找到最早和最晚时间
+	earliestTime := timePoints[0]
+	latestTime := timePoints[0]
+	for _, t := range timePoints {
+		if t.Before(earliestTime) {
+			earliestTime = t
+		}
+		if t.After(latestTime) {
+			latestTime = t
+		}
+	}
+
+	// 生成5小时窗口
+	blocks := p.generateBillingBlocks(earliestTime, latestTime, stats)
+	
+	return &models.BlocksReport{
+		Blocks:    blocks,
+		Summary:   stats.TotalTokens,
+		TotalCost: stats.EstimatedCost.TotalCost,
+	}, nil
+}
+
+// generateBillingBlocks 生成5小时计费窗口
+func (p *ClaudeParser) generateBillingBlocks(startTime, endTime time.Time, stats *models.UsageStats) []models.BillingBlock {
+	var blocks []models.BillingBlock
+	
+	// 将开始时间向下取整到最近的5小时边界
+	startHour := (startTime.Hour() / 5) * 5
+	blockStart := time.Date(startTime.Year(), startTime.Month(), startTime.Day(), startHour, 0, 0, 0, startTime.Location())
+	
+	// 如果开始时间在5小时边界之前，从前一个窗口开始
+	if blockStart.After(startTime) {
+		blockStart = blockStart.Add(-5 * time.Hour)
+	}
+	
+	currentTime := time.Now()
+	
+	for blockStart.Before(endTime.Add(5 * time.Hour)) {
+		blockEnd := blockStart.Add(5 * time.Hour)
+		
+		// 分析这个窗口内的活动
+		block := p.analyzeBlock(blockStart, blockEnd, stats, currentTime)
+		
+		// 只包含有活动的窗口
+		if block.MessageCount > 0 || block.IsActive {
+			blocks = append(blocks, block)
+		}
+		
+		blockStart = blockEnd
+	}
+	
+	return blocks
+}
+
+// analyzeBlock 分析单个5小时窗口
+func (p *ClaudeParser) analyzeBlock(blockStart, blockEnd time.Time, stats *models.UsageStats, currentTime time.Time) models.BillingBlock {
+	block := models.BillingBlock{
+		ID:        blockStart.Format("2006-01-02T15:04:05.000Z"),
+		StartTime: blockStart,
+		EndTime:   blockEnd,
+		IsActive:  currentTime.After(blockStart) && currentTime.Before(blockEnd),
+		Models:    []string{},
+	}
+	
+	// 计算实际结束时间和剩余时间
+	if block.IsActive {
+		block.ActualEndTime = currentTime
+		remaining := blockEnd.Sub(currentTime)
+		if remaining > 0 {
+			hours := int(remaining.Hours())
+			minutes := int(remaining.Minutes()) % 60
+			if hours > 0 {
+				block.TimeRemaining = fmt.Sprintf("%dh %dm", hours, minutes)
+			} else {
+				block.TimeRemaining = fmt.Sprintf("%dm", minutes)
+			}
+		}
+	} else {
+		block.ActualEndTime = blockEnd
+	}
+	
+	// 统计窗口内的会话
+	modelSet := make(map[string]bool)
+	var windowDuration time.Duration
+	
+	for _, session := range stats.SessionStats {
+		// 检查会话是否在此窗口内
+		if p.sessionInWindow(session, blockStart, blockEnd) {
+			block.MessageCount += session.MessageCount
+			block.Tokens.Add(session.Tokens)
+			
+			if session.Model != "" {
+				modelSet[session.Model] = true
+			}
+			
+			// 计算窗口内的实际活动时长
+			sessionStart := session.StartTime
+			sessionEnd := session.EndTime
+			
+			// 将会话时间限制在窗口内
+			if sessionStart.Before(blockStart) {
+				sessionStart = blockStart
+			}
+			if sessionEnd.After(blockEnd) {
+				sessionEnd = blockEnd
+			}
+			if sessionEnd.IsZero() || sessionEnd.Before(sessionStart) {
+				sessionEnd = sessionStart.Add(time.Minute) // 假设至少1分钟
+			}
+			
+			windowDuration += sessionEnd.Sub(sessionStart)
+		}
+	}
+	
+	// 提取模型列表
+	for model := range modelSet {
+		block.Models = append(block.Models, model)
+	}
+	
+	// 计算成本（从总成本按比例分配）
+	if stats.TotalTokens.GetTotalTokens() > 0 {
+		tokenRatio := float64(block.Tokens.GetTotalTokens()) / float64(stats.TotalTokens.GetTotalTokens())
+		block.CostUSD = stats.EstimatedCost.TotalCost * tokenRatio
+	}
+	
+	// 计算燃烧速率和预测
+	if block.IsActive && windowDuration.Minutes() > 0 {
+		tokensPerMinute := float64(block.Tokens.GetTotalTokens()) / windowDuration.Minutes()
+		block.BurnRate = int(tokensPerMinute)
+		
+		// 预测到窗口结束的总量
+		remainingMinutes := blockEnd.Sub(currentTime).Minutes()
+		if remainingMinutes > 0 {
+			projectedAdditional := tokensPerMinute * remainingMinutes
+			block.ProjectedTotal = block.Tokens.GetTotalTokens() + int(projectedAdditional)
+			
+			// 预测成本
+			if stats.TotalTokens.GetTotalTokens() > 0 {
+				projectedRatio := float64(block.ProjectedTotal) / float64(stats.TotalTokens.GetTotalTokens())
+				block.ProjectedCost = stats.EstimatedCost.TotalCost * projectedRatio
+			}
+		}
+	}
+	
+	return block
+}
+
+// sessionInWindow 检查会话是否在指定窗口内
+func (p *ClaudeParser) sessionInWindow(session models.SessionInfo, windowStart, windowEnd time.Time) bool {
+	sessionStart := session.StartTime
+	sessionEnd := session.EndTime
+	
+	// 如果会话没有结束时间，使用开始时间
+	if sessionEnd.IsZero() {
+		sessionEnd = sessionStart
+	}
+	
+	// 检查会话时间范围是否与窗口有重叠
+	return !(sessionEnd.Before(windowStart) || sessionStart.After(windowEnd))
+}
+
 // getMapKeys 获取map的所有键（调试用）
 func getMapKeys(m map[string]interface{}) []string {
 	keys := make([]string, 0, len(m))
