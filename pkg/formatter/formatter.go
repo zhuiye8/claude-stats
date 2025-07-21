@@ -125,6 +125,271 @@ func (f *Formatter) formatCSV(stats *models.UsageStats) (string, error) {
 	return builder.String(), writer.Error()
 }
 
+// FormatBlocks 格式化blocks报告为表格
+func (f *Formatter) FormatBlocks(report *models.BlocksReport) (string, error) {
+	var output strings.Builder
+
+	// 添加标题
+	output.WriteString(f.Colors.IconHeader("🕐", "5小时计费窗口分析", BrightBlue))
+	output.WriteString("\n\n")
+
+	if len(report.Blocks) == 0 {
+		output.WriteString("   📝 暂无活动窗口数据\n")
+		return output.String(), nil
+	}
+
+	// 创建表格
+	t := table.NewWriter()
+	t.AppendHeader(table.Row{
+		f.Colors.Header("窗口开始时间"),
+		f.Colors.Header("状态"),
+		f.Colors.Header("模型"),
+		f.Colors.Header("输入Token"),
+		f.Colors.Header("输出Token"),
+		f.Colors.Header("总Token"),
+		f.Colors.Header("成本(USD)"),
+	})
+
+	for _, block := range report.Blocks {
+		var status string
+		var models string
+
+		if block.IsActive {
+			status = f.Colors.BrightGreen(fmt.Sprintf("⏰ 活跃 (%s)", block.TimeRemaining))
+			if block.BurnRate > 0 {
+				status += f.Colors.Dim(fmt.Sprintf("\n🔥 速率: %s/分钟", formatNumber(block.BurnRate)))
+			}
+			if block.ProjectedTotal > 0 {
+				status += f.Colors.Dim(fmt.Sprintf("\n📊 预测: %s", formatNumber(block.ProjectedTotal)))
+			}
+		} else {
+			status = f.Colors.Dim("✅ 已完成")
+		}
+
+		if len(block.Models) > 0 {
+			for i, model := range block.Models {
+				if i > 0 {
+					models += ", "
+				}
+				models += f.Colors.BrightCyan("• " + model)
+			}
+		} else {
+			models = f.Colors.Dim("无")
+		}
+
+		t.AppendRow(table.Row{
+			block.StartTime.Format("2006-01-02 15:04:05"),
+			status,
+			models,
+			formatNumber(block.Tokens.InputTokens),
+			formatNumber(block.Tokens.OutputTokens),
+			formatNumber(block.Tokens.GetTotalTokens()),
+			fmt.Sprintf("$%.4f", block.CostUSD),
+		})
+	}
+
+	// 添加汇总行
+	t.AppendFooter(table.Row{
+		f.Colors.Bold("总计"),
+		"",
+		"",
+		f.Colors.Bold(formatNumber(report.Summary.InputTokens)),
+		f.Colors.Bold(formatNumber(report.Summary.OutputTokens)),
+		f.Colors.Bold(formatNumber(report.Summary.GetTotalTokens())),
+		f.Colors.Bold(fmt.Sprintf("$%.4f", report.TotalCost)),
+	})
+
+	t.SetStyle(table.StyleColoredBright)
+	output.WriteString(t.Render())
+	output.WriteString("\n\n")
+
+	return output.String(), nil
+}
+
+// FormatBlocksJSON 格式化blocks报告为JSON
+func (f *Formatter) FormatBlocksJSON(report *models.BlocksReport) (string, error) {
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// FormatDaily 格式化日报告为表格
+func (f *Formatter) FormatDaily(report *models.DailyReport) (string, error) {
+	var output strings.Builder
+
+	// 添加标题
+	output.WriteString(f.Colors.IconHeader("📅", "每日使用统计", BrightGreen))
+	output.WriteString("\n\n")
+
+	if len(report.DailyData) == 0 {
+		output.WriteString("   📝 暂无每日数据\n")
+		return output.String(), nil
+	}
+
+	// 创建表格
+	t := table.NewWriter()
+	headers := []table.Row{
+		{
+			f.Colors.Header("日期"),
+			f.Colors.Header("模型"),
+			f.Colors.Header("输入Token"),
+			f.Colors.Header("输出Token"),
+			f.Colors.Header("缓存Token"),
+			f.Colors.Header("总Token"),
+			f.Colors.Header("成本(USD)"),
+			f.Colors.Header("消息数"),
+		},
+	}
+
+	if f.ShowDetails {
+		headers[0] = append(headers[0], f.Colors.Header("会话数"))
+	}
+
+	t.AppendHeader(headers[0])
+
+	for _, dayData := range report.DailyData {
+		var modelsStr string
+		if len(dayData.Models) > 0 {
+			for i, model := range dayData.Models {
+				if i > 0 {
+					modelsStr += ", "
+				}
+				modelsStr += f.Colors.BrightCyan(model)
+			}
+		} else {
+			modelsStr = f.Colors.Dim("未知")
+		}
+
+		cacheTotal := dayData.CacheCreationTokens + dayData.CacheReadTokens
+		row := table.Row{
+			dayData.Date,
+			modelsStr,
+			formatNumber(dayData.InputTokens),
+			formatNumber(dayData.OutputTokens),
+			formatNumber(cacheTotal),
+			formatNumber(dayData.TotalTokens),
+			fmt.Sprintf("$%.4f", dayData.CostUSD),
+			formatNumber(dayData.MessageCount),
+		}
+
+		if f.ShowDetails {
+			row = append(row, formatNumber(dayData.SessionCount))
+		}
+
+		t.AppendRow(row)
+
+		// 如果有breakdown数据，添加模型分解行
+		if len(dayData.Breakdown) > 0 && f.ShowDetails {
+			for model, modelData := range dayData.Breakdown {
+				modelCacheTotal := modelData.CacheCreationTokens + modelData.CacheReadTokens
+				breakdownRow := table.Row{
+					f.Colors.Dim("  └─ " + model),
+					"",
+					formatNumber(modelData.InputTokens),
+					formatNumber(modelData.OutputTokens),
+					formatNumber(modelCacheTotal),
+					formatNumber(modelData.TotalTokens),
+					fmt.Sprintf("$%.4f", modelData.CostUSD),
+					formatNumber(modelData.MessageCount),
+				}
+				if f.ShowDetails {
+					breakdownRow = append(breakdownRow, "")
+				}
+				t.AppendRow(breakdownRow)
+			}
+		}
+	}
+
+	// 添加汇总行
+	summaryRow := table.Row{
+		f.Colors.Bold("总计"),
+		"",
+		f.Colors.Bold(formatNumber(report.Summary.InputTokens)),
+		f.Colors.Bold(formatNumber(report.Summary.OutputTokens)),
+		f.Colors.Bold(formatNumber(report.Summary.CacheCreationTokens + report.Summary.CacheReadTokens)),
+		f.Colors.Bold(formatNumber(report.Summary.TotalTokens)),
+		f.Colors.Bold(fmt.Sprintf("$%.4f", report.Summary.CostUSD)),
+		f.Colors.Bold(formatNumber(report.Summary.MessageCount)),
+	}
+	if f.ShowDetails {
+		summaryRow = append(summaryRow, f.Colors.Bold(formatNumber(report.Summary.SessionCount)))
+	}
+	t.AppendFooter(summaryRow)
+
+	t.SetStyle(table.StyleColoredBright)
+	output.WriteString(t.Render())
+	output.WriteString("\n\n")
+
+	return output.String(), nil
+}
+
+// FormatDailyJSON 格式化日报告为JSON
+func (f *Formatter) FormatDailyJSON(report *models.DailyReport) (string, error) {
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// FormatDailyCSV 格式化日报告为CSV
+func (f *Formatter) FormatDailyCSV(report *models.DailyReport) (string, error) {
+	var builder strings.Builder
+	writer := csv.NewWriter(&builder)
+
+	// 写入标题行
+	headers := []string{
+		"日期", "模型", "输入Token", "输出Token", "缓存创建Token", 
+		"缓存读取Token", "总Token", "成本(USD)", "消息数", "会话数",
+	}
+	if err := writer.Write(headers); err != nil {
+		return "", err
+	}
+
+	// 写入数据行
+	for _, dayData := range report.DailyData {
+		modelsStr := strings.Join(dayData.Models, ",")
+		
+		row := []string{
+			dayData.Date,
+			modelsStr,
+			fmt.Sprintf("%d", dayData.InputTokens),
+			fmt.Sprintf("%d", dayData.OutputTokens),
+			fmt.Sprintf("%d", dayData.CacheCreationTokens),
+			fmt.Sprintf("%d", dayData.CacheReadTokens),
+			fmt.Sprintf("%d", dayData.TotalTokens),
+			fmt.Sprintf("%.4f", dayData.CostUSD),
+			fmt.Sprintf("%d", dayData.MessageCount),
+			fmt.Sprintf("%d", dayData.SessionCount),
+		}
+		if err := writer.Write(row); err != nil {
+			return "", err
+		}
+	}
+
+	// 写入汇总行
+	summaryRow := []string{
+		"总计",
+		"",
+		fmt.Sprintf("%d", report.Summary.InputTokens),
+		fmt.Sprintf("%d", report.Summary.OutputTokens),
+		fmt.Sprintf("%d", report.Summary.CacheCreationTokens),
+		fmt.Sprintf("%d", report.Summary.CacheReadTokens),
+		fmt.Sprintf("%d", report.Summary.TotalTokens),
+		fmt.Sprintf("%.4f", report.Summary.CostUSD),
+		fmt.Sprintf("%d", report.Summary.MessageCount),
+		fmt.Sprintf("%d", report.Summary.SessionCount),
+	}
+	if err := writer.Write(summaryRow); err != nil {
+		return "", err
+	}
+
+	writer.Flush()
+	return builder.String(), writer.Error()
+}
+
 // formatTable 格式化为表格
 func (f *Formatter) formatTable(stats *models.UsageStats) (string, error) {
 	var output strings.Builder

@@ -5,7 +5,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/zhuiye8/claude-stats/pkg/parser"
@@ -70,6 +69,7 @@ func init() {
 	dailyCmd.Flags().StringVar(&costMode, "mode", "auto", "成本计算模式 (auto, calculate, display)")
 }
 
+// runDaily 执行每日分析
 func runDaily(cmd *cobra.Command, args []string) error {
 	// 确定要分析的目录列表
 	targetDirs := getTargetDirectories(args)
@@ -115,39 +115,6 @@ type DailyAnalyzer struct {
 	DateFilter *parser.DateFilter
 }
 
-// DailyReport 日报告结构
-type DailyReport struct {
-	Type      string            `json:"type"`
-	DailyData []DailyDataPoint  `json:"data"`
-	Summary   DailyDataPoint    `json:"summary"`
-}
-
-// DailyDataPoint 单日数据点
-type DailyDataPoint struct {
-	Date                    string                    `json:"date"`
-	Models                  []string                  `json:"models"`
-	InputTokens             int                       `json:"input_tokens"`
-	OutputTokens            int                       `json:"output_tokens"`
-	CacheCreationTokens     int                       `json:"cache_creation_tokens"`
-	CacheReadTokens         int                       `json:"cache_read_tokens"`
-	TotalTokens             int                       `json:"total_tokens"`
-	CostUSD                 float64                   `json:"cost_usd"`
-	MessageCount            int                       `json:"message_count"`
-	SessionCount            int                       `json:"session_count"`
-	Breakdown               map[string]DailyModelData `json:"breakdown,omitempty"`
-}
-
-// DailyModelData 每日模型数据
-type DailyModelData struct {
-	InputTokens         int     `json:"input_tokens"`
-	OutputTokens        int     `json:"output_tokens"`
-	CacheCreationTokens int     `json:"cache_creation_tokens"`
-	CacheReadTokens     int     `json:"cache_read_tokens"`
-	TotalTokens         int     `json:"total_tokens"`
-	CostUSD             float64 `json:"cost_usd"`
-	MessageCount        int     `json:"message_count"`
-}
-
 // NewDailyAnalyzer 创建新的日分析器
 func NewDailyAnalyzer() *DailyAnalyzer {
 	return &DailyAnalyzer{
@@ -158,7 +125,7 @@ func NewDailyAnalyzer() *DailyAnalyzer {
 }
 
 // AnalyzeDirectories 分析多个目录的日数据
-func (da *DailyAnalyzer) AnalyzeDirectories(targetDirs []string) (*DailyReport, error) {
+func (da *DailyAnalyzer) AnalyzeDirectories(targetDirs []string) (*models.DailyReport, error) {
 	// 创建基础解析器
 	claudeParser := parser.NewClaudeParser()
 	claudeParser.Verbose = da.Verbose
@@ -166,11 +133,11 @@ func (da *DailyAnalyzer) AnalyzeDirectories(targetDirs []string) (*DailyReport, 
 	claudeParser.DateFilter = da.DateFilter
 
 	// 按日聚合的数据结构
-	dailyAggregation := make(map[string]*DailyDataPoint)
-	totalSummary := &DailyDataPoint{
+	dailyAggregation := make(map[string]*models.DailyDataPoint)
+	totalSummary := &models.DailyDataPoint{
 		Date:      "总计",
 		Models:    []string{},
-		Breakdown: make(map[string]DailyModelData),
+		Breakdown: make(map[string]models.DailyModelData),
 	}
 
 	// 处理每个目录
@@ -197,9 +164,9 @@ func (da *DailyAnalyzer) AnalyzeDirectories(targetDirs []string) (*DailyReport, 
 	}
 
 	if len(dailyAggregation) == 0 {
-		return &DailyReport{
+		return &models.DailyReport{
 			Type:      "daily",
-			DailyData: []DailyDataPoint{},
+			DailyData: []models.DailyDataPoint{},
 			Summary:   *totalSummary,
 		}, nil
 	}
@@ -207,7 +174,7 @@ func (da *DailyAnalyzer) AnalyzeDirectories(targetDirs []string) (*DailyReport, 
 	// 转换为排序的切片
 	dailyData := da.convertAndSortDailyData(dailyAggregation)
 
-	return &DailyReport{
+	return &models.DailyReport{
 		Type:      "daily",
 		DailyData: dailyData,
 		Summary:   *totalSummary,
@@ -216,7 +183,7 @@ func (da *DailyAnalyzer) AnalyzeDirectories(targetDirs []string) (*DailyReport, 
 
 // processDirectoryForDaily 专门为日分析处理目录
 func (da *DailyAnalyzer) processDirectoryForDaily(parser *parser.ClaudeParser, dir string, 
-	dailyAggregation map[string]*DailyDataPoint, totalSummary *DailyDataPoint) error {
+	dailyAggregation map[string]*models.DailyDataPoint, totalSummary *models.DailyDataPoint) error {
 	
 	// 解析目录，但使用流式处理减少内存占用
 	stats, err := parser.ParseDirectory(dir)
@@ -228,10 +195,10 @@ func (da *DailyAnalyzer) processDirectoryForDaily(parser *parser.ClaudeParser, d
 	for dateStr, dailyUsage := range stats.DailyStats {
 		dayData, exists := dailyAggregation[dateStr]
 		if !exists {
-			dayData = &DailyDataPoint{
+			dayData = &models.DailyDataPoint{
 				Date:      dateStr,
 				Models:    []string{},
-				Breakdown: make(map[string]DailyModelData),
+				Breakdown: make(map[string]models.DailyModelData),
 			}
 			dailyAggregation[dateStr] = dayData
 		}
@@ -286,7 +253,7 @@ func (da *DailyAnalyzer) processDirectoryForDaily(parser *parser.ClaudeParser, d
 }
 
 // processModelBreakdown 处理模型分解数据
-func (da *DailyAnalyzer) processModelBreakdown(stats *models.UsageStats, dateStr string, dayData *DailyDataPoint) {
+func (da *DailyAnalyzer) processModelBreakdown(stats *models.UsageStats, dateStr string, dayData *models.DailyDataPoint) {
 	// 这里需要更精细的逻辑来分配模型使用到特定日期
 	// 从会话数据中提取每日每模型的使用情况
 	for _, session := range stats.SessionStats {
@@ -307,7 +274,7 @@ func (da *DailyAnalyzer) processModelBreakdown(stats *models.UsageStats, dateStr
 
 // calculateDailyCosts 计算每日成本
 func (da *DailyAnalyzer) calculateDailyCosts(stats *models.UsageStats, 
-	dailyAggregation map[string]*DailyDataPoint, totalSummary *DailyDataPoint) {
+	dailyAggregation map[string]*models.DailyDataPoint, totalSummary *models.DailyDataPoint) {
 	
 	// 根据costMode计算成本
 	switch da.CostMode {
@@ -330,7 +297,7 @@ func (da *DailyAnalyzer) calculateDailyCosts(stats *models.UsageStats,
 }
 
 // calculateCostsFromTokens 从Token计算成本
-func (da *DailyAnalyzer) calculateCostsFromTokens(dailyAggregation map[string]*DailyDataPoint, totalSummary *DailyDataPoint) {
+func (da *DailyAnalyzer) calculateCostsFromTokens(dailyAggregation map[string]*models.DailyDataPoint, totalSummary *models.DailyDataPoint) {
 	costCalculator := parser.NewCostCalculator()
 	
 	for _, dayData := range dailyAggregation {
@@ -377,7 +344,7 @@ func (da *DailyAnalyzer) calculateCostsFromTokens(dailyAggregation map[string]*D
 
 // usePrecalculatedCosts 使用预计算的成本
 func (da *DailyAnalyzer) usePrecalculatedCosts(stats *models.UsageStats, 
-	dailyAggregation map[string]*DailyDataPoint, totalSummary *DailyDataPoint) {
+	dailyAggregation map[string]*models.DailyDataPoint, totalSummary *models.DailyDataPoint) {
 	// TODO: 实现使用预计算成本的逻辑
 	// 目前回退到Token计算
 	da.calculateCostsFromTokens(dailyAggregation, totalSummary)
@@ -390,8 +357,8 @@ func (da *DailyAnalyzer) hasPrecalculatedCosts(stats *models.UsageStats) bool {
 }
 
 // convertAndSortDailyData 转换并排序日数据
-func (da *DailyAnalyzer) convertAndSortDailyData(dailyAggregation map[string]*DailyDataPoint) []DailyDataPoint {
-	var dailyData []DailyDataPoint
+func (da *DailyAnalyzer) convertAndSortDailyData(dailyAggregation map[string]*models.DailyDataPoint) []models.DailyDataPoint {
+	var dailyData []models.DailyDataPoint
 	
 	for _, dayData := range dailyAggregation {
 		dailyData = append(dailyData, *dayData)
@@ -409,7 +376,7 @@ func (da *DailyAnalyzer) convertAndSortDailyData(dailyAggregation map[string]*Da
 }
 
 // outputDailyReport 输出日报告
-func outputDailyReport(report *DailyReport) error {
+func outputDailyReport(report *models.DailyReport) error {
 	// 格式化并输出结果
 	formatter := formatter.NewFormatter()
 	formatter.ShowDetails = dailyBreakdown

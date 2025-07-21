@@ -153,6 +153,39 @@ type BlocksReport struct {
 	TotalCost float64       `json:"total_cost"`
 }
 
+// DailyReport 日报告结构
+type DailyReport struct {
+	Type      string            `json:"type"`
+	DailyData []DailyDataPoint  `json:"data"`
+	Summary   DailyDataPoint    `json:"summary"`
+}
+
+// DailyDataPoint 单日数据点
+type DailyDataPoint struct {
+	Date                    string                    `json:"date"`
+	Models                  []string                  `json:"models"`
+	InputTokens             int                       `json:"input_tokens"`
+	OutputTokens            int                       `json:"output_tokens"`
+	CacheCreationTokens     int                       `json:"cache_creation_tokens"`
+	CacheReadTokens         int                       `json:"cache_read_tokens"`
+	TotalTokens             int                       `json:"total_tokens"`
+	CostUSD                 float64                   `json:"cost_usd"`
+	MessageCount            int                       `json:"message_count"`
+	SessionCount            int                       `json:"session_count"`
+	Breakdown               map[string]DailyModelData `json:"breakdown,omitempty"`
+}
+
+// DailyModelData 每日模型数据
+type DailyModelData struct {
+	InputTokens         int     `json:"input_tokens"`
+	OutputTokens        int     `json:"output_tokens"`
+	CacheCreationTokens int     `json:"cache_creation_tokens"`
+	CacheReadTokens     int     `json:"cache_read_tokens"`
+	TotalTokens         int     `json:"total_tokens"`
+	CostUSD             float64 `json:"cost_usd"`
+	MessageCount        int     `json:"message_count"`
+}
+
 // GetTotalTokens 计算总token数
 func (u *TokenUsage) GetTotalTokens() int {
 	if u.TotalTokens > 0 {
