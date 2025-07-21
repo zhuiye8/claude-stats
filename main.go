@@ -12,4 +12,4 @@ func main() {
 		fmt.Fprintf(os.Stderr, "错误: %v\n", err)
 		os.Exit(1)
 	}
-} 
+}

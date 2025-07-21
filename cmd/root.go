@@ -11,6 +11,29 @@ import (
 var (
 	cfgFile string
 	verbose bool
+	// 通用命令参数
+	outputFormat string
+	outputFile   string
+	startDate    string
+	endDate      string
+	noColor      bool
+	offline      bool
+	costMode     string
+	// daily命令特定参数
+	dailyBreakdown bool
+	dailyOrder     string
+	// analyze命令特定参数
+	modelFilter string
+	showDetails bool
+	configDirs  []string
+	breakdown   bool
+	order       string
+	// blocks命令特定参数
+	blocksLive            bool
+	blocksTokenLimit      string
+	blocksRefreshInterval int
+	blocksActive          bool
+	blocksRecent          bool
 )
 
 // rootCmd 代表基础命令
@@ -29,7 +52,7 @@ var rootCmd = &cobra.Command{
 
 基本命令：
   claude-stats daily             # 每日使用报告（默认）
-  claude-stats monthly           # 月度使用报告
+  claude-stats monthly           # 月度使用报告  
   claude-stats session           # 会话分析
   claude-stats blocks            # 5小时计费窗口分析
   claude-stats blocks --live     # 实时监控模式
@@ -75,6 +98,11 @@ func init() {
 
 	// Cobra也支持本地标志位，只对当前命令运行
 	rootCmd.Flags().BoolP("version", "", false, "显示版本信息")
+
+	// 确保其他文件被包含在编译中
+	// 这些引用会强制Go编译器包含对应的文件
+	_ = dailyCmd
+	_ = blocksCmd
 }
 
 // initConfig 读取配置文件和环境变量
@@ -99,4 +127,4 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil && verbose {
 		fmt.Fprintln(os.Stderr, "使用配置文件:", viper.ConfigFileUsed())
 	}
-} 
+}

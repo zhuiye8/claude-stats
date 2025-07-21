@@ -12,12 +12,6 @@ import (
 	"github.com/zhuiye8/claude-stats/pkg/models"
 )
 
-var (
-	// daily命令特定参数
-	dailyBreakdown bool
-	dailyOrder     string
-)
-
 // dailyCmd 代表daily命令
 var dailyCmd = &cobra.Command{
 	Use:   "daily [目录路径]",

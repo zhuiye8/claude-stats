@@ -14,22 +14,6 @@ import (
 	"github.com/zhuiye8/claude-stats/pkg/models"
 )
 
-var (
-	outputFormat string
-	outputFile   string
-	startDate    string
-	endDate      string
-	modelFilter  string
-	showDetails  bool
-	noColor      bool
-	// 新增：多配置目录支持
-	configDirs   []string
-	offline      bool
-	breakdown    bool
-	order        string  // asc 或 desc
-	costMode     string  // auto, calculate, display
-)
-
 // analyzeCmd 代表analyze命令
 var analyzeCmd = &cobra.Command{
 	Use:   "analyze [目录路径]",

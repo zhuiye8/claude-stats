@@ -13,15 +13,6 @@ import (
 	"github.com/zhuiye8/claude-stats/pkg/models"
 )
 
-var (
-	// blocks命令特定参数
-	blocksLive         bool
-	blocksTokenLimit   string  // 支持 "max" 或数字
-	blocksRefreshInterval int
-	blocksActive       bool
-	blocksRecent       bool
-)
-
 // blocksCmd 代表blocks命令
 var blocksCmd = &cobra.Command{
 	Use:   "blocks [目录路径]",
