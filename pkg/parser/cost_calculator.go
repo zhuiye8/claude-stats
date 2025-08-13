@@ -6,14 +6,15 @@ import (
 
 // ModelPricing 代表模型定价信息
 type ModelPricing struct {
-	InputPricePerMToken  float64 // 每百万输入token的价格
-	OutputPricePerMToken float64 // 每百万输出token的价格
-	CachePricePerMToken  float64 // 每百万缓存token的价格
+	InputPricePerMToken      float64 // 每百万输入token的价格
+	OutputPricePerMToken     float64 // 每百万输出token的价格
+	CacheWritePricePerMToken float64 // 每百万缓存写入token的价格 (5分钟)
+	CacheReadPricePerMToken  float64 // 每百万缓存读取/刷新token的价格
 }
 
 // CostCalculator 用于计算使用成本
 type CostCalculator struct {
-	// 2025年7月最新定价 (美元/百万token)
+	// 定价来源: https://docs.anthropic.com/en/docs/about-claude/pricing (2025年8月)
 	ModelPrices map[string]ModelPricing
 }
 
@@ -21,62 +22,60 @@ type CostCalculator struct {
 func NewCostCalculator() *CostCalculator {
 	return &CostCalculator{
 		ModelPrices: map[string]ModelPricing{
-			// Claude 4 模型 (2025年定价)
-			"claude-sonnet-4-20250514": {
-				InputPricePerMToken:  15.0,  // $15/MTok 输入
-				OutputPricePerMToken: 75.0,  // $75/MTok 输出
-				CachePricePerMToken:  1.875, // $1.875/MTok 缓存读取
-			},
-			"claude-4-sonnet": {
-				InputPricePerMToken:  15.0,
-				OutputPricePerMToken: 75.0,
-				CachePricePerMToken:  1.875,
-			},
+			// Claude 4 / Opus
 			"claude-opus-4": {
-				InputPricePerMToken:  60.0,  // $60/MTok 输入
-				OutputPricePerMToken: 300.0, // $300/MTok 输出  
-				CachePricePerMToken:  7.5,   // $7.5/MTok 缓存读取
+				InputPricePerMToken:      15.0,
+				OutputPricePerMToken:     75.0,
+				CacheWritePricePerMToken: 18.75, // 1.25x of input
+				CacheReadPricePerMToken:  1.50,  // 0.1x of input
 			},
-			"claude-4-opus": {
-				InputPricePerMToken:  60.0,
-				OutputPricePerMToken: 300.0,
-				CachePricePerMToken:  7.5,
+			"claude-opus-3": {
+				InputPricePerMToken:      15.0,
+				OutputPricePerMToken:     75.0,
+				CacheWritePricePerMToken: 18.75,
+				CacheReadPricePerMToken:  1.50,
 			},
-			
-			// Claude 3.5 模型
-			"claude-3-5-sonnet-20241022": {
-				InputPricePerMToken:  3.0,   // $3/MTok 输入
-				OutputPricePerMToken: 15.0,  // $15/MTok 输出
-				CachePricePerMToken:  0.375, // $0.375/MTok 缓存读取
+			// Claude 4 / Sonnet
+			"claude-sonnet-4": {
+				InputPricePerMToken:      3.0,
+				OutputPricePerMToken:     15.0,
+				CacheWritePricePerMToken: 3.75, // 1.25x of input
+				CacheReadPricePerMToken:  0.30, // 0.1x of input
 			},
-			"claude-3-5-haiku-20241022": {
-				InputPricePerMToken:  1.0,   // $1/MTok 输入
-				OutputPricePerMToken: 5.0,   // $5/MTok 输出
-				CachePricePerMToken:  0.125, // $0.125/MTok 缓存读取
-			},
-			
-			// 向后兼容旧版本名称
+			// Claude 3.5 Sonnet
 			"claude-3-5-sonnet": {
-				InputPricePerMToken:  3.0,
-				OutputPricePerMToken: 15.0,
-				CachePricePerMToken:  0.375,
+				InputPricePerMToken:      3.0,
+				OutputPricePerMToken:     15.0,
+				CacheWritePricePerMToken: 3.75,
+				CacheReadPricePerMToken:  0.30,
 			},
-			"claude-3-5-haiku": {
-				InputPricePerMToken:  1.0,
-				OutputPricePerMToken: 5.0,
-				CachePricePerMToken:  0.125,
-			},
-			
-			// Claude 3 模型（兼容性）
-			"claude-3-opus": {
-				InputPricePerMToken:  15.0,
-				OutputPricePerMToken: 75.0,
-				CachePricePerMToken:  1.875,
-			},
+			// Claude 3 Sonnet
 			"claude-3-sonnet": {
-				InputPricePerMToken:  3.0,
-				OutputPricePerMToken: 15.0,
-				CachePricePerMToken:  0.375,
+				InputPricePerMToken:      3.0,
+				OutputPricePerMToken:     15.0,
+				CacheWritePricePerMToken: 3.75,
+				CacheReadPricePerMToken:  0.30,
+			},
+			// Claude 3.5 Haiku
+			"claude-3-5-haiku": {
+				InputPricePerMToken:      0.80,
+				OutputPricePerMToken:     4.0,
+				CacheWritePricePerMToken: 1.0, // 1.25x of input
+				CacheReadPricePerMToken:  0.08, // 0.1x of input
+			},
+			// Claude 3 Haiku
+			"claude-3-haiku": {
+				InputPricePerMToken:      0.25,
+				OutputPricePerMToken:     1.25,
+				CacheWritePricePerMToken: 0.30,  // Table value, slightly different from 1.25x
+				CacheReadPricePerMToken:  0.03, // Table value, slightly different from 0.1x
+			},
+			// Default fallback (matches Sonnet 3.5)
+			"default": {
+				InputPricePerMToken:      3.0,
+				OutputPricePerMToken:     15.0,
+				CacheWritePricePerMToken: 3.75,
+				CacheReadPricePerMToken:  0.30,
 			},
 		},
 	}
@@ -113,27 +112,37 @@ func (c *CostCalculator) Calculate(totalUsage *models.TokenUsage, modelStats map
 func (c *CostCalculator) calculateModelCost(model string, usage *models.TokenUsage) float64 {
 	pricing, exists := c.ModelPrices[model]
 	if !exists {
-		// 使用默认定价（Claude 3.5 Sonnet）
-		pricing = c.ModelPrices["claude-3-5-sonnet"]
+		// 尝试匹配模型族
+		switch {
+		case strings.Contains(model, "opus"):
+			pricing = c.ModelPrices["claude-opus-3"]
+		case strings.Contains(model, "sonnet"):
+			pricing = c.ModelPrices["claude-3-5-sonnet"]
+		case strings.Contains(model, "haiku"):
+			pricing = c.ModelPrices["claude-3-5-haiku"]
+		default:
+			// 使用默认定价
+			pricing = c.ModelPrices["default"]
+		}
 	}
 
 	inputCost := float64(usage.InputTokens) * pricing.InputPricePerMToken / 1_000_000
 	outputCost := float64(usage.OutputTokens) * pricing.OutputPricePerMToken / 1_000_000
-	cacheCreationCost := float64(usage.CacheCreationTokens) * pricing.InputPricePerMToken / 1_000_000
-	cacheReadCost := float64(usage.CacheReadTokens) * pricing.CachePricePerMToken / 1_000_000
+	cacheCreationCost := float64(usage.CacheCreationTokens) * pricing.CacheWritePricePerMToken / 1_000_000
+	cacheReadCost := float64(usage.CacheReadTokens) * pricing.CacheReadPricePerMToken / 1_000_000
 
 	return inputCost + outputCost + cacheCreationCost + cacheReadCost
 }
 
 // breakdownCosts 分解总成本
 func (c *CostCalculator) breakdownCosts(breakdown *models.CostBreakdown, totalUsage *models.TokenUsage) {
-	// 使用默认定价进行分解
-	pricing := c.ModelPrices["claude-3-5-sonnet"]
+	// 使用默认定价进行分解 (Sonnet 3.5)
+	pricing := c.ModelPrices["default"]
 
 	breakdown.InputCost = float64(totalUsage.InputTokens) * pricing.InputPricePerMToken / 1_000_000
 	breakdown.OutputCost = float64(totalUsage.OutputTokens) * pricing.OutputPricePerMToken / 1_000_000
-	breakdown.CacheCreationCost = float64(totalUsage.CacheCreationTokens) * pricing.InputPricePerMToken / 1_000_000
-	breakdown.CacheReadCost = float64(totalUsage.CacheReadTokens) * pricing.CachePricePerMToken / 1_000_000
+	breakdown.CacheCreationCost = float64(totalUsage.CacheCreationTokens) * pricing.CacheWritePricePerMToken / 1_000_000
+	breakdown.CacheReadCost = float64(totalUsage.CacheReadTokens) * pricing.CacheReadPricePerMToken / 1_000_000
 }
 
 // GetSubscriptionEquivalent 获取订阅模式的等价成本信息

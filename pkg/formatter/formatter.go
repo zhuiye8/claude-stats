@@ -221,7 +221,12 @@ func (f *Formatter) FormatDaily(report *models.DailyReport) (string, error) {
 
 	// 添加标题
 	output.WriteString(f.Colors.IconHeader("📅", "每日使用统计", BrightGreen))
-	output.WriteString("\n\n")
+	output.WriteString("\n")
+
+	// 添加重要提示
+	output.WriteString(f.Colors.Warning("   * 这是一个本地消费分析工具，显示的成本是基于您本地的Token使用量和Claude API的公开价格估算的等价成本。\n"))
+	output.WriteString(f.Colors.Dim("   * 对于订阅用户（如Pro/Max），您的实际账单是固定的月费，此处的成本估算可帮助您了解使用价值，而非实际应付金额。\n\n"))
+
 
 	if len(report.DailyData) == 0 {
 		output.WriteString("   📝 暂无每日数据\n")
@@ -236,9 +241,10 @@ func (f *Formatter) FormatDaily(report *models.DailyReport) (string, error) {
 			f.Colors.Header("模型"),
 			f.Colors.Header("输入Token"),
 			f.Colors.Header("输出Token"),
-			f.Colors.Header("缓存Token"),
+			f.Colors.Header("缓存创建"),
+			f.Colors.Header("缓存读取"),
 			f.Colors.Header("总Token"),
-			f.Colors.Header("成本(USD)"),
+			f.Colors.Header("等价成本(USD)"),
 			f.Colors.Header("消息数"),
 		},
 	}
@@ -262,13 +268,13 @@ func (f *Formatter) FormatDaily(report *models.DailyReport) (string, error) {
 			modelsStr = f.Colors.Dim("未知")
 		}
 
-		cacheTotal := dayData.CacheCreationTokens + dayData.CacheReadTokens
 		row := table.Row{
 			dayData.Date,
 			modelsStr,
 			formatNumber(dayData.InputTokens),
 			formatNumber(dayData.OutputTokens),
-			formatNumber(cacheTotal),
+			f.Colors.Success(formatNumber(dayData.CacheCreationTokens)),
+			f.Colors.Info(formatNumber(dayData.CacheReadTokens)),
 			formatNumber(dayData.TotalTokens),
 			fmt.Sprintf("$%.4f", dayData.CostUSD),
 			formatNumber(dayData.MessageCount),
@@ -283,13 +289,13 @@ func (f *Formatter) FormatDaily(report *models.DailyReport) (string, error) {
 		// 如果有breakdown数据，添加模型分解行
 		if len(dayData.Breakdown) > 0 && f.ShowDetails {
 			for model, modelData := range dayData.Breakdown {
-				modelCacheTotal := modelData.CacheCreationTokens + modelData.CacheReadTokens
 				breakdownRow := table.Row{
 					f.Colors.Dim("  └─ " + model),
 					"",
 					formatNumber(modelData.InputTokens),
 					formatNumber(modelData.OutputTokens),
-					formatNumber(modelCacheTotal),
+					f.Colors.Success(formatNumber(modelData.CacheCreationTokens)),
+					f.Colors.Info(formatNumber(modelData.CacheReadTokens)),
 					formatNumber(modelData.TotalTokens),
 					fmt.Sprintf("$%.4f", modelData.CostUSD),
 					formatNumber(modelData.MessageCount),
@@ -308,7 +314,8 @@ func (f *Formatter) FormatDaily(report *models.DailyReport) (string, error) {
 		"",
 		f.Colors.Bold(formatNumber(report.Summary.InputTokens)),
 		f.Colors.Bold(formatNumber(report.Summary.OutputTokens)),
-		f.Colors.Bold(formatNumber(report.Summary.CacheCreationTokens + report.Summary.CacheReadTokens)),
+		f.Colors.Bold(f.Colors.Success(formatNumber(report.Summary.CacheCreationTokens))),
+		f.Colors.Bold(f.Colors.Info(formatNumber(report.Summary.CacheReadTokens))),
 		f.Colors.Bold(formatNumber(report.Summary.TotalTokens)),
 		f.Colors.Bold(fmt.Sprintf("$%.4f", report.Summary.CostUSD)),
 		f.Colors.Bold(formatNumber(report.Summary.MessageCount)),
